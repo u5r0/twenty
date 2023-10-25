@@ -219,7 +219,7 @@ export const ValidationStep = <T extends string>({
             onRowsChange={updateRow}
             columns={columns}
             selectedRows={selectedRows}
-            onSelectedRowsChange={setSelectedRows}
+            onSelectedRowsChange={() => setSelectedRows}
             components={{
               noRowsFallback: (
                 <StyledNoRowsContainer>

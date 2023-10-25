@@ -1,3 +1,4 @@
+/* eslint-disable simple-import-sort/exports */
 /* eslint-disable no-restricted-imports */
 export {
   Icon2fa,
@@ -714,7 +715,7 @@ export {
   IconBrandMercedes,
   IconBrandMessenger,
   IconBrandMeta,
-  IconBrandMicrosoftTeams,
+  IconBrandTeams,
   IconBrandMinecraft,
   IconBrandMiniprogram,
   IconBrandMixpanel,

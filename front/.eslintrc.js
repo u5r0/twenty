@@ -1,14 +1,10 @@
 module.exports = {
   parser: '@typescript-eslint/parser',
-  parserOptions: {
-    project: 'tsconfig.json',
-    tsconfigRootDir: __dirname,
-    sourceType: 'module',
-  },
   plugins: [
     '@typescript-eslint/eslint-plugin',
     'unused-imports',
     'simple-import-sort',
+    'react-refresh',
     'prefer-arrow',
     'twenty',
   ],
@@ -113,6 +109,10 @@ module.exports = {
           },
         ],
       },
+    ],
+    'react-refresh/only-export-components': [
+      'warn',
+      { allowConstantExport: true },
     ],
     "@typescript-eslint/consistent-type-imports": ["error", { "prefer": "no-type-imports" }],
     'no-console': ['error', { allow: ['group', 'groupCollapsed', 'groupEnd'] }],
