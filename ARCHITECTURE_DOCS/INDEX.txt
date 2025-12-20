@@ -1,0 +1,286 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                    TWENTY PROJECT ARCHITECTURE DOCUMENTATION                  ║
+║                          Complete Specification v1.0                          ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+📚 DOCUMENTATION FILES (7 comprehensive spec documents)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣  README.md (14 KB)
+    └─ Navigation guide and index for all architecture documents
+    └─ Quick reference for common use cases
+    └─ Start here for orientation
+
+2️⃣  01-OVERVIEW.md (11 KB)
+    └─ High-level architecture overview
+    └─ Technology stack breakdown
+    └─ System design patterns and layers
+    └─ Module organization (backend & frontend)
+    └─ Authentication, APIs, and external integrations
+
+3️⃣  02-STATE_MANAGEMENT.md (11 KB)
+    └─ Complete state management architecture
+    └─ Recoil atoms and selectors (frontend)
+    └─ Apollo Client caching (frontend)
+    └─ Server-side state (databases, Redis, services)
+    └─ State synchronization patterns
+    └─ Real-time updates and WebSockets
+    └─ Best practices and performance tips
+
+4️⃣  03-DATA_MODEL.md (21 KB)
+    └─ Server-side database architecture
+    └─ Core schema (system tables)
+    └─ Metadata schema (object definitions)
+    └─ Workspace schemas (multi-tenancy)
+    └─ TypeORM entities and relationships
+    └─ TwentyORM custom ORM layer
+    └─ Field types and data access patterns
+    └─ Performance optimization and migrations
+
+5️⃣  04-API_COMMUNICATION.md (16 KB)
+    └─ GraphQL API specification
+    └─ Query, mutation, and subscription examples
+    └─ Schema types and input validation
+    └─ Error handling and rate limiting
+    └─ REST API (legacy support)
+    └─ Caching strategies and pagination
+    └─ File uploads and batch operations
+    └─ WebSocket subscriptions
+
+6️⃣  05-FRONTEND_ARCHITECTURE.md (23 KB)
+    └─ React component architecture
+    └─ Project structure and modules
+    └─ Hooks (Apollo, Recoil, React)
+    └─ Component patterns (Page, Container, Presentational)
+    └─ State management examples
+    └─ Form handling with React Hook Form
+    └─ Error boundaries and handling
+    └─ Performance optimization and testing
+
+7️⃣  QUICK_REFERENCE.md (18 KB)
+    └─ One-page visual system overview
+    └─ Request/response cycle diagrams
+    └─ State management layers
+    └─ API endpoints mapping
+    └─ Common operations walkthrough
+    └─ Technology decision matrix
+    └─ Debugging and security checklists
+    └─ Quick commands reference
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 DOCUMENTATION STATISTICS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Total Size:             ~124 KB
+Total Lines:            ~3,000+
+Code Examples:          150+
+Diagrams:              20+
+Tables:                30+
+Cross-references:      100+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 HOW TO USE THIS DOCUMENTATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For First-Time Understanding:
+   1. Start with README.md (orientation)
+   2. Read 01-OVERVIEW.md (big picture)
+   3. Skim QUICK_REFERENCE.md (visual summary)
+
+For Implementation Tasks:
+   → Backend feature: Read 03-DATA_MODEL.md + 04-API_COMMUNICATION.md
+   → Frontend feature: Read 05-FRONTEND_ARCHITECTURE.md + 04-API_COMMUNICATION.md
+   → State management: Read 02-STATE_MANAGEMENT.md
+   → Real-time updates: Read 02-STATE_MANAGEMENT.md + 04-API_COMMUNICATION.md
+
+For Debugging Issues:
+   → Frontend problems: 05-FRONTEND_ARCHITECTURE.md (Debugging Tips section)
+   → Backend problems: 03-DATA_MODEL.md + 04-API_COMMUNICATION.md
+   → State issues: 02-STATE_MANAGEMENT.md
+   → API issues: 04-API_COMMUNICATION.md
+
+For Architecture Questions:
+   → System design: 01-OVERVIEW.md
+   → Data flow: 02-STATE_MANAGEMENT.md
+   → Database design: 03-DATA_MODEL.md
+   → Component patterns: 05-FRONTEND_ARCHITECTURE.md
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔍 QUICK SEARCH TOPICS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+API / GraphQL              → 04-API_COMMUNICATION.md
+Atoms & Selectors         → 02-STATE_MANAGEMENT.md (Recoil section)
+Authentication            → 01-OVERVIEW.md + 04-API_COMMUNICATION.md
+Authorization             → 01-OVERVIEW.md + 03-DATA_MODEL.md
+Cache Strategy            → 02-STATE_MANAGEMENT.md + 04-API_COMMUNICATION.md
+Component Patterns        → 05-FRONTEND_ARCHITECTURE.md
+Custom Hooks              → 05-FRONTEND_ARCHITECTURE.md
+Database Schema           → 03-DATA_MODEL.md
+DataLoader Pattern        → 03-DATA_MODEL.md
+Entity Relationships      → 03-DATA_MODEL.md
+Error Handling            → 04-API_COMMUNICATION.md + 05-FRONTEND_ARCHITECTURE.md
+Field Types               → 03-DATA_MODEL.md
+Form Handling             → 05-FRONTEND_ARCHITECTURE.md
+GraphQL Subscriptions     → 04-API_COMMUNICATION.md + 02-STATE_MANAGEMENT.md
+Module Organization       → 01-OVERVIEW.md + 05-FRONTEND_ARCHITECTURE.md
+Mutations                 → 04-API_COMMUNICATION.md
+Performance Optimization  → 01-OVERVIEW.md + 05-FRONTEND_ARCHITECTURE.md
+Permissions & RBAC        → 03-DATA_MODEL.md
+Queries                   → 04-API_COMMUNICATION.md
+React Hooks               → 05-FRONTEND_ARCHITECTURE.md
+Real-time Sync            → 02-STATE_MANAGEMENT.md
+Recoil State              → 02-STATE_MANAGEMENT.md
+REST API                  → 04-API_COMMUNICATION.md
+State Management          → 02-STATE_MANAGEMENT.md
+Testing                   → 05-FRONTEND_ARCHITECTURE.md
+TypeORM Entities          → 03-DATA_MODEL.md
+TwentyORM                 → 03-DATA_MODEL.md
+Workspace Isolation       → 03-DATA_MODEL.md + 01-OVERVIEW.md
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 ARCHITECTURE LAYERS COVERED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Presentation Layer (Frontend):
+  ✓ React components and architecture
+  ✓ State management (Recoil + Apollo)
+  ✓ Form handling and validation
+  ✓ Error handling and boundaries
+  ✓ Performance optimization
+
+API Layer:
+  ✓ GraphQL schema and operations
+  ✓ REST API endpoints
+  ✓ Authentication & authorization
+  ✓ Error responses and codes
+  ✓ WebSocket subscriptions
+
+Business Logic Layer:
+  ✓ NestJS services and modules
+  ✓ Dependency injection
+  ✓ Domain logic and workflows
+  ✓ Event-driven architecture
+  ✓ Permission checking
+
+Data Access Layer:
+  ✓ TypeORM entities and repositories
+  ✓ TwentyORM custom ORM
+  ✓ Query building and optimization
+  ✓ DataLoader for batch queries
+  ✓ Migrations and versioning
+
+Database Layer:
+  ✓ PostgreSQL schema design
+  ✓ Multi-tenancy implementation
+  ✓ ClickHouse analytics
+  ✓ Redis caching
+  ✓ Indexes and query optimization
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🛠️ TECHNOLOGIES DOCUMENTED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Backend:
+  ✓ NestJS (11.1.9)
+  ✓ GraphQL (via @graphql-yoga)
+  ✓ TypeORM
+  ✓ TwentyORM (custom)
+  ✓ PostgreSQL
+  ✓ ClickHouse
+  ✓ Redis
+  ✓ NestJS Query
+  ✓ Passport (authentication)
+  ✓ Bull/RabbitMQ (queues)
+
+Frontend:
+  ✓ React (18.2)
+  ✓ TypeScript
+  ✓ Recoil (0.7.7)
+  ✓ Apollo Client (3.7.17)
+  ✓ Emotion (styling)
+  ✓ Linaria (styling)
+  ✓ React Hook Form
+  ✓ Vite (build)
+  ✓ React Router v6
+  ✓ Lingui (i18n)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 KEY CONCEPTS EXPLAINED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Workspace:          Isolated tenant/organization in Twenty
+Metadata:           Object & field definitions (customizable schema)
+Object Record:      Individual CRM record (Company, Contact, etc.)
+GraphQL Query:      Request to fetch data from server
+GraphQL Mutation:   Request to modify data on server
+GraphQL Subscription: Real-time updates via WebSocket
+Recoil Atom:        Single unit of state (like useState)
+Recoil Selector:    Derived state computed from atoms
+Apollo Cache:       Normalized storage of GraphQL responses
+TwentyORM:          Workspace-aware ORM wrapper
+TypeORM:            SQL database ORM
+RBAC:              Role-Based Access Control
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ WHAT'S INCLUDED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ Complete system architecture overview
+✓ Detailed technology stack breakdown
+✓ State management patterns and best practices
+✓ Database schema and data model specification
+✓ API communication protocol documentation
+✓ Frontend component architecture guide
+✓ Code examples (150+)
+✓ Diagrams and visual representations
+✓ Performance optimization tips
+✓ Security considerations
+✓ Debugging guides
+✓ Common use cases walkthrough
+✓ Best practices for all layers
+✓ Module organization examples
+✓ Quick reference guides
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📞 SUPPORT & UPDATES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Created:        December 20, 2025
+Version:        1.0
+Status:         Complete
+Last Updated:   December 20, 2025
+
+For updates or corrections, refer to the project's contribution guidelines.
+For questions about architecture, check the relevant document sections.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 START HERE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Recommended reading order:
+
+  1. README.md              (5 min)   - Orientation
+  2. 01-OVERVIEW.md        (10 min)  - High-level architecture
+  3. QUICK_REFERENCE.md    (5 min)   - Visual summary
+  4. [Choose based on task]:
+     - Data modeling → 03-DATA_MODEL.md
+     - Frontend → 05-FRONTEND_ARCHITECTURE.md
+     - State mgmt → 02-STATE_MANAGEMENT.md
+     - APIs → 04-API_COMMUNICATION.md
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This documentation directory contains everything needed to understand,
+develop, and maintain the Twenty CRM platform architecture.
+
+Happy learning! 🎓
