@@ -795,7 +795,6 @@ npx husky add .husky/pre-commit "yarn lint && yarn test"
 ## Next Steps
 
 - [Contributing Guide](./21-contributing.md)
-- [Pull Request Process](./23-pr-process.md)
 - [Testing Strategy](./15-testing-strategy.md)
 
 ---

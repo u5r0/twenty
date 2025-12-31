@@ -556,7 +556,6 @@ By contributing, you agree that your contributions will be licensed under the AG
 ## Next Steps
 
 - [Code Style Guide](./22-code-style.md)
-- [Pull Request Process](./23-pr-process.md)
 - [Development Setup](./03-development-setup.md)
 
 ---
