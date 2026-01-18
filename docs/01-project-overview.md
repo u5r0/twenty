@@ -122,14 +122,21 @@ Twenty uses Nx to manage a monorepo with multiple packages:
 ```
 twenty/
 ├── packages/
-│   ├── twenty-front/      # React frontend application
-│   ├── twenty-server/     # NestJS backend server
-│   ├── twenty-ui/         # Shared UI component library
-│   ├── twenty-emails/     # Email templates
-│   ├── twenty-sdk/        # JavaScript/TypeScript SDK
-│   ├── twenty-docs/       # Documentation site
-│   ├── twenty-website/    # Marketing website
-│   └── ...
+│   ├── twenty-front/         # React frontend application
+│   ├── twenty-server/        # NestJS backend server
+│   ├── twenty-ui/            # Shared UI component library
+│   ├── twenty-emails/        # Email templates
+│   ├── twenty-sdk/           # JavaScript/TypeScript SDK
+│   ├── twenty-docs/          # Documentation site
+│   ├── twenty-website/       # Marketing website
+│   ├── twenty-shared/        # Shared utilities and types
+│   ├── twenty-utils/         # Utility packages
+│   ├── twenty-cli/           # CLI tools
+│   ├── create-twenty-app/    # App scaffolding tool
+│   ├── twenty-docker/        # Docker configurations
+│   ├── twenty-zapier/        # Zapier integration
+│   ├── twenty-e2e-testing/   # End-to-end tests
+│   └── twenty-apps/          # Community and internal apps
 ```
 
 ### Technology Stack
@@ -138,7 +145,7 @@ twenty/
 - React 18 with TypeScript
 - Recoil for state management
 - Apollo Client for GraphQL
-- Emotion/Linaria for styling
+- Emotion and Linaria for styling
 - Vite for build tooling
 
 **Backend:**

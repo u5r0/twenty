@@ -46,10 +46,11 @@ Twenty follows a modern **client-server architecture** with a clear separation b
 
 Twenty uses **Nx** to manage a monorepo containing multiple packages:
 
-- **Applications:** twenty-front, twenty-server, twenty-website
-- **Libraries:** twenty-ui, twenty-shared, twenty-utils
-- **Tools:** twenty-cli, create-twenty-app
-- **Integrations:** twenty-zapier, twenty-sdk
+- **Applications:** twenty-front, twenty-server, twenty-website, twenty-docs
+- **Libraries:** twenty-ui, twenty-shared, twenty-utils, twenty-emails
+- **Tools:** twenty-cli, create-twenty-app, twenty-sdk
+- **Integrations:** twenty-zapier, twenty-apps
+- **Infrastructure:** twenty-docker, twenty-e2e-testing
 
 Benefits:
 - Shared code and dependencies
@@ -169,13 +170,18 @@ twenty-front/
 │   │   ├── auth/          # Authentication
 │   │   ├── companies/     # Companies management
 │   │   ├── people/        # People management
+│   │   ├── object-record/ # Generic object record handling
 │   │   ├── views/         # View system (table, kanban)
 │   │   ├── settings/      # Settings & configuration
-│   │   └── ...
+│   │   ├── workflow/      # Workflow automation
+│   │   ├── ui/            # UI components
+│   │   └── ...            # 50+ other modules
 │   ├── pages/             # Route components
 │   ├── generated/         # Generated GraphQL types
+│   ├── generated-metadata/# Generated metadata types
 │   ├── testing/           # Test utilities
-│   └── __stories__/       # Storybook stories
+│   ├── hooks/             # Shared hooks
+│   └── utils/             # Utility functions
 ```
 
 **Key Technologies:**
@@ -183,7 +189,7 @@ twenty-front/
 - TypeScript (type safety)
 - Recoil (state management)
 - Apollo Client (GraphQL client)
-- Emotion/Linaria (styling)
+- Emotion (styling - via twenty-ui package)
 - Vite (build tool)
 
 ### Backend (twenty-server)
@@ -191,19 +197,25 @@ twenty-front/
 ```
 twenty-server/
 ├── src/
-│   ├── engine/            # Core engine
-│   │   ├── api/           # GraphQL API layer
-│   │   ├── metadata/      # Metadata management
-│   │   ├── workspace/     # Workspace management
-│   │   └── twenty-orm/    # Custom ORM
-│   ├── modules/           # Business logic modules
-│   │   ├── auth/          # Authentication
-│   │   ├── user/          # User management
-│   │   ├── workflow/      # Workflow automation
-│   │   ├── messaging/     # Email/messaging
+│   ├── engine/                    # Core engine
+│   │   ├── api/                   # GraphQL API layer
+│   │   ├── metadata-modules/      # Metadata management
+│   │   ├── core-modules/          # Core business modules (auth, user, workspace, etc.)
+│   │   ├── workspace-manager/     # Workspace lifecycle management
+│   │   ├── workspace-datasource/  # Workspace data source handling
+│   │   ├── twenty-orm/            # Custom ORM
+│   │   ├── dataloaders/           # DataLoader implementations
+│   │   └── ...                    # Other engine components
+│   ├── modules/                   # Domain-specific modules
+│   │   ├── messaging/             # Email/messaging
+│   │   ├── workflow/              # Workflow automation
+│   │   ├── calendar/              # Calendar integration
+│   │   ├── company/               # Company domain
+│   │   ├── person/                # Person domain
 │   │   └── ...
-│   ├── database/          # Database migrations
-│   └── integrations/      # External integrations
+│   ├── database/                  # Database migrations
+│   ├── command/                   # CLI commands
+│   └── queue-worker/              # Background job worker
 ```
 
 **Key Technologies:**
