@@ -1,6 +1,6 @@
 # State Management
 
-Comprehensivete management in Twenty using Recoil and Apollo Client.
+Comprehensive state management in Twenty using Recoil and Apollo Client.
 
 ## State Management Layers
 
@@ -875,13 +875,13 @@ const peopleState = atom({
 
 ## Next Steps
 
-- [Frontend Architecture](./07-frontend-architecture.md)
-- [Component Guidelines](./08-component-guidelines.md)
-- [GraphQL API](./13-graphql-api.md)
+- [Frontend Architecture](./05-frontend-architecture.md)
+- [Component Guidelines](./06-component-guidelines.md)
+- [GraphQL API](./10-graphql-api.md)
 
 ---
 
 **Related Documentation:**
-- [Technology Stack](./06-technology-stack.md)
-- [Frontend Testing](./16-frontend-testing.md)
+- [Technology Stack](./04-technology-stack.md)
+- [Frontend Testing](./13-frontend-testing.md)
 

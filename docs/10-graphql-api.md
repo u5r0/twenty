@@ -1,26 +1,33 @@
 # GraphQL API
 
-Complete guide to Twenty's GraphQL API, including schema design, queries, mutations, and subscriptions.
+Complete guide to Twenty's GraphQL API, including schema design, queries, mutations, and real-time subscriptions.
 
 ## Overview
 
-Twenty uses GraphQL as its primary API layer, providing:
-- **Type-safe queries** - Strong typing with TypeScript
+Twenty uses GraphQL Yoga as its primary API layer, providing:
+- **Type-safe queries** - Strong typing with TypeScript and auto-generated schemas
 - **Flexible data fetching** - Request exactly what you need
-- **Real-time updates** - WebSocket subscriptions
-- **Automatic documentation** - Self-documenting schema
-- **Efficient batching** - DataLoader pattern
+- **Real-time updates** - Server-Sent Events (SSE) subscriptions
+- **Automatic documentation** - Self-documenting schema via introspection
+- **Efficient batching** - DataLoader pattern for N+1 query prevention
 
-## GraphQL Endpoint
+## GraphQL Endpoints
+
+Twenty provides two GraphQL endpoints:
 
 ```
-Developttp://localhost:3001/graphql
-Production: https://api.your-domain.com/graphql
+Core API (Workspace Data):
+  Development: http://localhost:3000/graphql
+  Production: https://your-domain.com/graphql
+
+Metadata API (Schema Management):
+  Development: http://localhost:3000/metadata
+  Production: https://your-domain.com/metadata
 ```
 
 ## Authentication
 
-All requests (except auth endpoints) require authentication:
+All requests (except public endpoints) require authentication:
 
 ```http
 POST /graphql
@@ -28,32 +35,76 @@ Authorization: Bearer YOUR_ACCESS_TOKEN
 Content-Type: application/json
 ```
 
+Twenty uses JWT-based authentication with access and refresh tokens.
+
 ## Schema Structure
 
-### Core Types
+Twenty's GraphQL schema is dynamically generated from workspace entities. The schema uses decorators to define types, fields, and relations.
 
-**Object Type:**
+### Workspace Entity Example
+
+**Company Entity (Backend):**
+```typescript
+@WorkspaceEntity({
+  standardId: STANDARD_OBJECT_IDS.company,
+  namePlural: 'companies',
+  labelSingular: msg`Company`,
+  labelPlural: msg`Companies`,
+  description: msg`A company`,
+  icon: STANDARD_OBJECT_ICONS.company,
+})
+export class CompanyWorkspaceEntity extends BaseWorkspaceEntity {
+  @WorkspaceField({
+    type: FieldMetadataType.TEXT,
+    label: msg`Name`,
+    description: msg`The company name`,
+  })
+  @WorkspaceIsNullable()
+  name: string | null;
+
+  @WorkspaceField({
+    type: FieldMetadataType.LINKS,
+    label: msg`Domain Name`,
+    description: msg`The company website URL`,
+  })
+  @WorkspaceIsNullable()
+  domainName: LinksMetadata;
+
+  @WorkspaceField({
+    type: FieldMetadataType.NUMBER,
+    label: msg`Employees`,
+    description: msg`Number of employees`,
+  })
+  @WorkspaceIsNullable()
+  employees: number | null;
+
+  @WorkspaceRelation({
+    type: RelationType.ONE_TO_MANY,
+    label: msg`People`,
+    description: msg`People linked to the company`,
+    inverseSideTarget: () => PersonWorkspaceEntity,
+  })
+  people: Relation<PersonWorkspaceEntity[]>;
+}
+```
+
+**Generated GraphQL Type:**
 ```graphql
 type Company {
   id: ID!
-  name: String!
-  domainName: String
-  employees: Int
-  industry: String
-  people: [Person!]!
+  name: String
+  domainName: Links
+  employees: Float
+  people: PersonConnection!
   createdAt: DateTime!
   updatedAt: DateTime!
+  deletedAt: DateTime
 }
 
-type Person {
-  id: ID!
-  firstName: String!
-  lastName: String!
-  email: String!
-  phone: String
-  company: Company
-  createdAt: DateTime!
-  updatedAt: DateTime!
+type Links {
+  primaryLinkUrl: String
+  primaryLinkLabel: String
+  secondaryLinks: [String!]
 }
 ```
 
@@ -62,7 +113,6 @@ type Person {
 type CompanyConnection {
   edges: [CompanyEdge!]!
   pageInfo: PageInfo!
-  totalCount: Int!
 }
 
 type CompanyEdge {
@@ -71,75 +121,40 @@ type CompanyEdge {
 }
 
 type PageInfo {
-  hasNextPage: Boolean!
-  hasPreviousPage: Boolean!
+  hasNextPage: Boolean
+  hasPreviousPage: Boolean
   startCursor: String
   endCursor: String
 }
 ```
 
-**Input Types:**
-```graphql
-input CreateCompanyInput {
-  name: String!
-  domainName: String
-  employees: Int
-  industry: String
-}
-
-input UpdateCompanyInput {
-  name: String
-  domainName: String
-  employees: Int
-  industry: String
-}
-```
-
 **Filter Types:**
 ```graphql
-input CompanyFilter {
+input CompanyFilterInput {
   name: StringFilter
-  industry: StringFilter
-  employees: IntFilter
-  AND: [CompanyFilter!]
-  OR: [CompanyFilter!]
+  employees: FloatFilter
+  and: [CompanyFilterInput!]
+  or: [CompanyFilterInput!]
+  not: CompanyFilterInput
 }
 
 input StringFilter {
   eq: String
-  contains: String
-  startsWith: String
-  endsWith: String
+  neq: String
   in: [String!]
+  is: String
+  like: String
+  ilike: String
 }
 
-input IntFilter {
-  eq: Int
-  gt: Int
-  gte: Int
-  lt: Int
-  lte: Int
-  in: [Int!]
-}
-```
-
-**Sort Types:**
-```graphql
-input CompanySort {
-  field: CompanySortField!
-  direction: SortDirection!
-}
-
-enum CompanySortField {
-  NAME
-  EMPLOYEES
-  CREATED_AT
-  UPDATED_AT
-}
-
-enum SortDirection {
-  ASC
-  DESC
+input FloatFilter {
+  eq: Float
+  gt: Float
+  gte: Float
+  lt: Float
+  lte: Float
+  in: [Float!]
+  is: String
 }
 ```
 
@@ -148,13 +163,15 @@ enum SortDirection {
 ### Fetch Single Record
 
 ```graphql
-query GetCompany($id: ID!) {
-  company(id: $id) {
+query FindOneCompany($filter: CompanyFilterInput!) {
+  company(filter: $filter) {
     id
     name
-    domainName
+    domainName {
+      primaryLinkUrl
+      primaryLinkLabel
+    }
     employees
-    industry
     createdAt
     updatedAt
   }
@@ -164,22 +181,9 @@ query GetCompany($id: ID!) {
 **Variables:**
 ```json
 {
-  "id": "123e4567-e89b-12d3-a456-426614174000"
-}
-```
-
-**Response:**
-```json
-{
-  "data": {
-    "company": {
-      "id": "123e4567-e89b-12d3-a456-426614174000",
-      "name": "Acme Corp",
-      "domainName": "acme.com",
-      "employees": 100,
-      "industry": "Technology",
-      "createdAt": "2024-01-01T00:00:00Z",
-      "updatedAt": "2024-01-01T00:00:00Z"
+  "filter": {
+    "id": {
+      "eq": "123e4567-e89b-12d3-a456-426614174000"
     }
   }
 }
@@ -188,16 +192,14 @@ query GetCompany($id: ID!) {
 ### Fetch List with Filtering
 
 ```graphql
-query GetCompanies($filter: CompanyFilter, $sort: [CompanySort!]) {
-  companies(filter: $filter, sort: $sort) {
+query FindManyCompanies($filter: CompanyFilterInput, $orderBy: [CompanyOrderByInput!]) {
+  companies(filter: $filter, orderBy: $orderBy) {
     edges {
       node {
         id
         name
-        industry
         employees
       }
-      cursor
     }
     pageInfo {
       hasNextPage
@@ -205,7 +207,6 @@ query GetCompanies($filter: CompanyFilter, $sort: [CompanySort!]) {
       startCursor
       endCursor
     }
-    totalCount
   }
 }
 ```
@@ -214,17 +215,13 @@ query GetCompanies($filter: CompanyFilter, $sort: [CompanySort!]) {
 ```json
 {
   "filter": {
-    "industry": {
-      "eq": "Technology"
-    },
     "employees": {
       "gte": 50
     }
   },
-  "sort": [
+  "orderBy": [
     {
-      "field": "NAME",
-      "direction": "ASC"
+      "name": "AscNullsFirst"
     }
   ]
 }
@@ -234,7 +231,7 @@ query GetCompanies($filter: CompanyFilter, $sort: [CompanySort!]) {
 
 **Forward Pagination (first/after):**
 ```graphql
-query GetCompanies($first: Int!, $after: String) {
+query FindManyCompanies($first: Int, $after: String) {
   companies(first: $first, after: $after) {
     edges {
       node {
@@ -261,7 +258,7 @@ query GetCompanies($first: Int!, $after: String) {
 
 **Backward Pagination (last/before):**
 ```graphql
-query GetCompanies($last: Int!, $before: String) {
+query FindManyCompanies($last: Int, $before: String) {
   companies(last: $last, before: $before) {
     edges {
       node {
@@ -281,17 +278,21 @@ query GetCompanies($last: Int!, $before: String) {
 ### Nested Queries
 
 ```graphql
-query GetCompanyWithPeople($id: ID!) {
-  company(id: $id) {
+query FindOneCompanyWithPeople($filter: CompanyFilterInput!) {
+  company(filter: $filter) {
     id
     name
     people {
       edges {
         node {
           id
-          firstName
-          lastName
-          email
+          name {
+            firstName
+            lastName
+          }
+          emails {
+            primaryEmail
+          }
         }
       }
     }
@@ -302,17 +303,19 @@ query GetCompanyWithPeople($id: ID!) {
 ### Complex Filtering
 
 ```graphql
-query GetFilteredCompanies {
+query FindManyCompaniesWithComplexFilter {
   companies(
     filter: {
-      OR: [
+      or: [
         {
-          industry: { eq: "Technology" }
-          employees: { gte: 100 }
-        }
+          and: [
+            { employees: { gte: 100 } }
+          ]
+        },
         {
-          industry: { eq: "Finance" }
-          employees: { gte: 500 }
+          and: [
+            { employees: { gte: 500 } }
+          ]
         }
       ]
     }
@@ -321,25 +324,8 @@ query GetFilteredCompanies {
       node {
         id
         name
-        industry
         employees
       }
-    }
-  }
-}
-```
-
-### Aggregations
-
-```graphql
-query GetCompanyStats {
-  companyStats {
-    totalCount
-    averageEmployees
-    byIndustry {
-      industry
-      count
-      averageEmployees
     }
   }
 }
@@ -350,13 +336,14 @@ query GetCompanyStats {
 ### Create Record
 
 ```graphql
-mutation CreateCompany($data: CreateCompanyInput!) {
+mutation CreateOneCompany($data: CompanyCreateInput!) {
   createCompany(data: $data) {
     id
     name
-    domainName
+    domainName {
+      primaryLinkUrl
+    }
     employees
-    industry
     createdAt
   }
 }
@@ -367,25 +354,11 @@ mutation CreateCompany($data: CreateCompanyInput!) {
 {
   "data": {
     "name": "Acme Corp",
-    "domainName": "acme.com",
-    "employees": 100,
-    "industry": "Technology"
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "data": {
-    "createCompany": {
-      "id": "123e4567-e89b-12d3-a456-426614174000",
-      "name": "Acme Corp",
-      "domainName": "acme.com",
-      "employees": 100,
-      "industry": "Technology",
-      "createdAt": "2024-01-01T00:00:00Z"
-    }
+    "domainName": {
+      "primaryLinkUrl": "https://acme.com",
+      "primaryLinkLabel": "Website"
+    },
+    "employees": 100
   }
 }
 ```
@@ -393,8 +366,8 @@ mutation CreateCompany($data: CreateCompanyInput!) {
 ### Update Record
 
 ```graphql
-mutation UpdateCompany($id: ID!, $data: UpdateCompanyInput!) {
-  updateCompany(id: $id, data: $data) {
+mutation UpdateOneCompany($idToUpdate: ID!, $input: CompanyUpdateInput!) {
+  updateCompany(id: $idToUpdate, data: $input) {
     id
     name
     employees
@@ -406,8 +379,8 @@ mutation UpdateCompany($id: ID!, $data: UpdateCompanyInput!) {
 **Variables:**
 ```json
 {
-  "id": "123e4567-e89b-12d3-a456-426614174000",
-  "data": {
+  "idToUpdate": "123e4567-e89b-12d3-a456-426614174000",
+  "input": {
     "employees": 150
   }
 }
@@ -416,24 +389,17 @@ mutation UpdateCompany($id: ID!, $data: UpdateCompanyInput!) {
 ### Delete Record
 
 ```graphql
-mutation DeleteCompany($id: ID!) {
-  deleteCompany(id: $id)
+mutation DeleteOneCompany($idToDelete: ID!) {
+  deleteCompany(id: $idToDelete) {
+    id
+  }
 }
 ```
 
 **Variables:**
 ```json
 {
-  "id": "123e4567-e89b-12d3-a456-426614174000"
-}
-```
-
-**Response:**
-```json
-{
-  "data": {
-    "deleteCompany": true
-  }
+  "idToDelete": "123e4567-e89b-12d3-a456-426614174000"
 }
 ```
 
@@ -441,7 +407,7 @@ mutation DeleteCompany($id: ID!) {
 
 **Batch Create:**
 ```graphql
-mutation CreateCompanies($data: [CreateCompanyInput!]!) {
+mutation CreateManyCompanies($data: [CompanyCreateInput!]!) {
   createCompanies(data: $data) {
     id
     name
@@ -451,101 +417,64 @@ mutation CreateCompanies($data: [CreateCompanyInput!]!) {
 
 **Batch Update:**
 ```graphql
-mutation UpdateCompanies($updates: [CompanyUpdateBatch!]!) {
-  updateCompanies(updates: $updates) {
+mutation UpdateManyCompanies($filter: CompanyFilterInput!, $data: CompanyUpdateInput!) {
+  updateCompanies(filter: $filter, data: $data) {
     id
     name
     updatedAt
   }
-}
-```
-
-**Variables:**
-```json
-{
-  "updates": [
-    {
-      "id": "id-1",
-      "data": { "employees": 100 }
-    },
-    {
-      "id": "id-2",
-      "data": { "employees": 200 }
-    }
-  ]
 }
 ```
 
 **Batch Delete:**
 ```graphql
-mutation DeleteCompanies($ids: [ID!]!) {
-  deleteCompanies(ids: $ids)
+mutation DeleteManyCompanies($filter: CompanyFilterInput!) {
+  deleteCompanies(filter: $filter) {
+    id
+  }
 }
 ```
 
 ## Subscriptions
 
-### Subscribe to Record Changes
+Twenty uses Server-Sent Events (SSE) for real-time subscriptions, not WebSockets.
+
+### Subscribe to Database Events
 
 ```graphql
-subscription OnCompanyUpdated($id: ID!) {
-  companyUpdated(id: $id) {
-    id
-    name
-    employees
-    updatedAt
+subscription ListenToDbEvents {
+  onDbEvent {
+    eventType
+    objectMetadataId
+    recordId
+    properties
   }
 }
 ```
 
-### Subscribe to List Changes
-
-```graphql
-subscription OnCompaniesChanged {
-  companiesChanged {
-    mutation
-    node {
-      id
-      name
-    }
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "data": {
-    "companiesChanged": {
-      "mutation": "CREATED",
-      "node": {
-        "id": "new-id",
-        "name": "New Company"
-      }
-    }
-  }
-}
-```
-
-### WebSocket Connection
+### SSE Connection (Frontend)
 
 ```typescript
-import { createClient } from 'graphql-ws';
+import { createClient } from 'graphql-sse';
 
 const client = createClient({
-  url: 'ws://localhost:3001/graphql',
-  connectionParams: {
-    authorization: `Bearer ${token}`,
+  url: 'http://localhost:3000/graphql',
+  headers: () => {
+    const token = getAuthToken();
+    return {
+      authorization: token ? `Bearer ${token}` : '',
+    };
   },
 });
 
+// Subscribe to events
 const unsubscribe = client.subscribe(
   {
     query: `
       subscription {
-        companyUpdated(id: "123") {
-          id
-          name
+        onDbEvent {
+          eventType
+          recordId
         }
       }
     `,
@@ -556,6 +485,22 @@ const unsubscribe = client.subscribe(
     complete: () => console.log('Complete'),
   }
 );
+
+// Cleanup
+unsubscribe();
+```
+
+### Subscription Match
+
+```graphql
+subscription OnSubscriptionMatch {
+  onSubscriptionMatch {
+    id
+    workspaceId
+    userId
+    createdAt
+  }
+}
 ```
 
 ## Error Handling
@@ -566,17 +511,9 @@ const unsubscribe = client.subscribe(
 {
   "errors": [
     {
-      "message": "Company not found",
-      "locations": [
-        {
-          "line": 2,
-          "column": 3
-        }
-      ],
-      "path": ["company"],
+      "message": "Record not found",
       "extensions": {
-        "code": "NOT_FOUND",
-        "statusCode": 404
+        "code": "NOT_FOUND"
       }
     }
   ],
@@ -594,14 +531,15 @@ const unsubscribe = client.subscribe(
 | `BAD_USER_INPUT` | Invalid input | 400 |
 | `INTERNAL_SERVER_ERROR` | Server error | 500 |
 
-### Handling Errors
+### Handling Errors (Frontend)
 
 ```typescript
 import { useQuery } from '@apollo/client';
+import { GET_COMPANY } from './queries';
 
 function CompanyDetails({ id }: { id: string }) {
   const { data, loading, error } = useQuery(GET_COMPANY, {
-    variables: { id },
+    variables: { filter: { id: { eq: id } } },
   });
 
   if (loading) return <Spinner />;
@@ -625,169 +563,119 @@ function CompanyDetails({ id }: { id: string }) {
 
 ### DataLoader (N+1 Prevention)
 
+Twenty uses DataLoader to batch and cache database queries:
+
 ```typescript
-// Backend implementation
+// DataLoader Service (Backend)
 import DataLoader from 'dataloader';
+import { Injectable } from '@nestjs/common';
 
 @Injectable()
-export class CompanyLoader {
-  private loader: DataLoader<string, Company>;
-
-  constructor(private companyRepository: CompanyRepository) {
-    this.loader = new DataLoader(async (ids: string[]) => {
-      const companies = await this.companyRepository.findByIds(ids);
-      const companyMap = new Map(companies.map(c => [c.id, c]));
-      return ids.map(id => companyMap.get(id));
-    });
-  }
-
-  load(id: string): Promise<Company> {
-    return this.loader.load(id);
+export class DataloaderService {
+  createLoaders(workspaceId: string) {
+    return {
+      fieldMetadataLoader: new DataLoader(async (keys: string[]) => {
+        const fieldMetadata = await this.fieldMetadataRepository.find({
+          where: { id: In(keys), workspaceId },
+        });
+        const fieldMetadataMap = new Map(
+          fieldMetadata.map((f) => [f.id, f])
+        );
+        return keys.map((key) => fieldMetadataMap.get(key));
+      }),
+    };
   }
 }
 
 // Usage in resolver
-@ResolveField(() => Company)
-async company(
-  @Parent() person: Person,
-  @Context() { loaders }: { loaders: Loaders },
+@ResolveField(() => [FieldMetadataDTO])
+async fields(
+  @Parent() objectMetadata: ObjectMetadataDTO,
+  @Context() { loaders }: { loaders: IDataloaders },
 ) {
-  return loaders.company.load(person.companyId);
+  return loaders.fieldMetadataLoader.loadMany(
+    objectMetadata.fieldMetadataIds
+  );
 }
 ```
 
 ### Field-Level Authorization
 
+Twenty uses guards for authorization:
+
 ```typescript
 @Resolver(() => Company)
 export class CompanyResolver {
   @Query(() => Company)
-  @UseGuards(JwtAuthGuard)
-  async company(@Args('id') id: string) {
-    return this.companyService.findOne(id);
+  @UseGuards(WorkspaceAuthGuard)
+  async company(@Args('filter') filter: CompanyFilterInput) {
+    return this.companyService.findOne(filter);
   }
 
   @ResolveField(() => [Person])
-  @UseGuards(FieldPermissionGuard)
-  @RequirePermission('company.people.read')
+  @UseGuards(WorkspaceAuthGuard)
   async people(@Parent() company: Company) {
     return this.personService.findByCompany(company.id);
   }
 }
 ```
 
-### Custom Scalars
+### Custom Field Types
+
+Twenty supports custom field metadata types:
 
 ```typescript
-// Custom Date scalar
-import { Scalar, CustomScalar } from '@nestjs/graphql';
-import { Kind, ValueNode } from 'graphql';
-
-@Scalar('DateTime')
-export class DateTimeScalar implements CustomScalar<string, Date> {
-  description = 'DateTime custom scalar type';
-
-  parseValue(value: string): Date {
-    return new Date(value);
-  }
-
-  serialize(value: Date): string {
-    return value.toISOString();
-  }
-
-  parseLiteral(ast: ValueNode): Date {
-    if (ast.kind === Kind.STRING) {
-      return new Date(ast.value);
-    }
-    return null;
-  }
-}
-```
-
-### Directives
-
-```graphql
-directive @auth(requires: Role = MEMBER) on FIELD_DEFINITION | OBJECT
-
-type Company @auth(requires: MEMBER) {
-  id: ID!
-  name: String!
-  revenue: Float @auth(requires: ADMIN)
+// Field metadata types
+export enum FieldMetadataType {
+  TEXT = 'TEXT',
+  NUMBER = 'NUMBER',
+  BOOLEAN = 'BOOLEAN',
+  DATE_TIME = 'DATE_TIME',
+  LINKS = 'LINKS',
+  EMAILS = 'EMAILS',
+  PHONES = 'PHONES',
+  CURRENCY = 'CURRENCY',
+  FULL_NAME = 'FULL_NAME',
+  ADDRESS = 'ADDRESS',
+  RELATION = 'RELATION',
+  // ... more types
 }
 ```
 
 ## Performance Optimization
 
-### Query Complexity
+### Query Complexity Validation
+
+Twenty validates query complexity to prevent expensive queries:
 
 ```typescript
-// Limit query complexity
-import { GraphQLSchemaHost } from '@nestjs/graphql';
-import { Plugin } from '@nestjs/apollo';
-import {
-  ApolloServerPlugin,
-  GraphQLRequestListener,
-} from 'apollo-server-plugin-base';
+// GraphQL Config (Backend)
+import { useValidateGraphqlQueryComplexity } from 'src/engine/core-modules/graphql/hooks/use-validate-graphql-query-complexity.hook';
 
-@Plugin()
-export class ComplexityPlugin implements ApolloServerPlugin {
-  constructor(private gqlSchemaHost: GraphQLSchemaHost) {}
-
-  async requestDidStart(): Promise<GraphQLRequestListener> {
-    const maxComplexity = 1000;
-    const { schema } = this.gqlSchemaHost;
-
-    return {
-      async didResolveOperation({ request, document }) {
-        const complexity = getComplexity({
-          schema,
-          operationName: request.operationName,
-          query: document,
-          variables: request.variables,
-        });
-
-        if (complexity > maxComplexity) {
-          throw new Error(
-            `Query is too complex: ${complexity}. Maximum allowed complexity: ${maxComplexity}`,
-          );
-        }
-      },
-    };
-  }
-}
-```
-
-### Caching
-
-```typescript
-// Cache directive
-import { CacheControl } from '@nestjs/graphql';
-
-@Resolver(() => Company)
-export class CompanyResolver {
-  @Query(() => Company)
-  @CacheControl({ maxAge: 60 })
-  async company(@Args('id') id: string) {
-    return this.companyService.findOne(id);
-  }
-}
-```
-
-### Persisted Queries
-
-```typescript
-// Enable persisted queries
-import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
-
-GraphQLModule.forRoot({
-  autoSchemaFile: true,
-  persistedQueries: {
-    cache: new Map(),
-  },
+const config: YogaDriverConfig = {
   plugins: [
-    ApolloServerPluginLandingPageLocalDefault({ embed: true }),
+    useValidateGraphqlQueryComplexity({
+      maximumAllowedFields: 2000,
+      maximumAllowedRootResolvers: 10,
+      checkDuplicateRootResolvers: true,
+    }),
   ],
-});
+};
+```
+
+Configuration variables:
+- `COMMON_QUERY_COMPLEXITY_LIMIT`: Default 2000
+- `GRAPHQL_MAX_FIELDS`: Maximum fields per query
+- `GRAPHQL_MAX_ROOT_RESOLVERS`: Maximum root resolvers per query
+
+### Introspection Control
+
+Introspection is disabled for unauthenticated users in production:
+
+```typescript
+useDisableIntrospectionAndSuggestionsForUnauthenticatedUsers(
+  process.env.NODE_ENV === 'production'
+)
 ```
 
 ## Testing GraphQL API
@@ -795,7 +683,7 @@ GraphQLModule.forRoot({
 ### Using cURL
 
 ```bash
-curl -X POST http://localhost:3001/graphql \
+curl -X POST http://localhost:3000/graphql \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -d '{
@@ -805,15 +693,15 @@ curl -X POST http://localhost:3001/graphql \
 
 ### Using GraphQL Playground
 
-Navigate to `http://localhost:3001/graphql` in your browser.
+Navigate to `http://localhost:3000/graphql` in your browser (development mode only).
 
-### Using Apollo Client
+### Using Apollo Client (Frontend)
 
 ```typescript
 import { ApolloClient, InMemoryCache, gql } from '@apollo/client';
 
 const client = new ApolloClient({
-  uri: 'http://localhost:3001/graphql',
+  uri: 'http://localhost:3000/graphql',
   cache: new InMemoryCache(),
   headers: {
     authorization: `Bearer ${token}`,
@@ -822,7 +710,7 @@ const client = new ApolloClient({
 
 const { data } = await client.query({
   query: gql`
-    query GetCompanies {
+    query FindManyCompanies {
       companies {
         edges {
           node {
@@ -854,22 +742,7 @@ const { data } = await client.query({
      }
    }
 
-   # Bad (requesting unnecessary fields)
-   query {
-     companies {
-       edges {
-         node {
-           id
-           name
-           domainName
-           employees
-           industry
-           createdAt
-           updatedAt
-         }
-       }
-     }
-   }
+   # Avoid requesting unnecessary fields
    ```
 
 2. **Use fragments for reusability**
@@ -877,39 +750,25 @@ const { data } = await client.query({
    fragment CompanyFields on Company {
      id
      name
-     industry
+     employees
    }
 
    query {
-     company(id: "123") {
+     company(filter: { id: { eq: "123" } }) {
        ...CompanyFields
      }
    }
    ```
 
 3. **Avoid deep nesting**
-   ```graphql
-   # Avoid
-   query {
-     company {
-       people {
-         company {
-           people {
-             company {
-               # Too deep!
-             }
-           }
-         }
-       }
-     }
-   }
-   ```
+   - Limit query depth to prevent performance issues
+   - Use pagination for large result sets
 
 ### Mutation Design
 
 1. **Return updated data**
    ```graphql
-   mutation UpdateCompany($id: ID!, $data: UpdateCompanyInput!) {
+   mutation UpdateOneCompany($id: ID!, $data: CompanyUpdateInput!) {
      updateCompany(id: $id, data: $data) {
        id
        name
@@ -918,7 +777,7 @@ const { data } = await client.query({
    }
    ```
 
-2. **Use optimistic updates**
+2. **Use optimistic updates (Frontend)**
    ```typescript
    const [updateCompany] = useMutation(UPDATE_COMPANY, {
      optimisticResponse: {
@@ -931,16 +790,25 @@ const { data } = await client.query({
    });
    ```
 
+## Architecture
+
+Twenty's GraphQL implementation uses:
+- **GraphQL Yoga** - Modern GraphQL server
+- **NestJS** - Backend framework with decorators
+- **TypeORM** - Database ORM
+- **Apollo Client** - Frontend GraphQL client
+- **Server-Sent Events** - Real-time subscriptions
+
 ## Next Steps
 
-- [API Reference](./24-api-reference.md)
-- [Backend Architecture](./11-backend-architecture.md)
-- [Authentication](./14-auth.md)
+- [Backend Architecture](./08-backend-architecture.md)
+- [Frontend Architecture](./05-frontend-architecture.md)
+- [Database & ORM](./09-database-orm.md)
+- [Authentication](./11-auth.md)
 
 ---
 
 **Related Documentation:**
-- [Frontend Architecture](./07-frontend-architecture.md)
-- [Database & ORM](./12-database-orm.md)
-- [Testing Strategy](./15-testing-strategy.md)
+- [System Architecture](./02-system-architecture.md)
+- [Testing Strategy](./12-testing-strategy.md)
 

@@ -1,4 +1,4 @@
-# Frontendchitecture
+# Frontend Architecture
 
 Comprehensive guide to Twenty's frontend architecture, built with React, TypeScript, and modern tooling.
 
@@ -19,9 +19,9 @@ packages/twenty-front/
 ├── src/
 │   ├── modules/              # Feature modules
 │   │   ├── auth/             # Authentication
-│   │   ├── companies/        # Companies management
-│   │   ├── people/           # People management
-│   │   ├── opportunities/    # Sales opportunities
+│   │   ├── companies/        # Companies type definitions
+│   │   ├── people/           # People type definitions
+│   │   ├── opportunities/    # Opportunities type definitions
 │   │   ├── activities/       # Tasks and notes
 │   │   ├── views/            # View system (table, kanban)
 │   │   ├── settings/         # Settings and configuration
@@ -29,28 +29,24 @@ packages/twenty-front/
 │   │   ├── object-record/    # Generic record operations
 │   │   ├── object-metadata/  # Metadata management
 │   │   ├── workflow/         # Workflow automation
-│   │   └── ...
+│   │   ├── app/              # App root component and routing
+│   │   └── ...               # Many other feature modules
 │   ├── pages/                # Route components
 │   │   ├── auth/             # Auth pages
-│   │   ├── companies/        # Company pages
-│   │   ├── people/           # People pages
+│   │   ├── object-record/    # Generic object record pages (companies, people, etc.)
 │   │   ├── settings/         # Settings pages
+│   │   ├── onboarding/       # Onboarding pages
 │   │   └── not-found/        # 404 page
 │   ├── generated/            # Generated GraphQL types
-│   │   ├── graphql.tsx       # Generated hooks and types
-│   │   └── schema.graphql    # GraphQL schema
+│   │   └── graphql.ts        # Generated hooks and types
+│   ├── generated-metadata/   # Generated metadata types
 │   ├── testing/              # Test utilities
-│   │   ├── decorators/       # Storybook decorators
-│   │   ├── mock-data/        # Mock data
-│   │   └── test-utils.tsx    # Testing utilities
-│   ├── __stories__/          # Storybook stories
-│   ├── App.tsx               # Root component
-│   ├── index.tsx             # Entry point
-│   └── router.tsx            # Route configuration
+│   ├── config/               # Configuration
+│   ├── hooks/                # Global hooks
+│   ├── utils/                # Global utilities
+│   ├── types/                # Global types
+│   └── index.tsx             # Entry point
 ├── public/                   # Static assets
-│   ├── images/               # Images
-│   ├── icons/                # Icons
-│   └── index.html            # HTML template
 ├── .storybook/               # Storybook configuration
 ├── vite.config.ts            # Vite configuration
 ├── tsconfig.json             # TypeScript configuration
@@ -61,41 +57,61 @@ packages/twenty-front/
 
 ### Feature Module Structure
 
-Each feature module follows a consistent structure:
+Twenty uses a modular architecture where different modules have different structures based on their purpose:
 
+**Type-Only Modules** (e.g., `companies/`, `people/`, `opportunities/`):
 ```
 modules/companies/
-├── components/               # React components
-│   ├── CompanyCard.tsx
-│   ├── CompanyForm.tsx
-│   └── CompanyList.tsx
-├── hooks/                    # Custom hooks
-│   ├── useCompanies.ts
-│   ├── useCreateCompany.ts
-│   └── useUpdateCompany.ts
-├── states/                   # Recoil state
-│   ├── companyState.ts
-│   ├── selectedCompanyState.ts
-│   └── companyFiltersState.ts
-├── graphql/                  # GraphQL queries/mutations
-│   ├── queries/
-│   │   ├── getCompanies.ts
-│   │   └── getCompany.ts
-│   └── mutations/
-│       ├── createCompany.ts
-│       └── updateCompany.ts
-├── types/                    # TypeScript types
-│   └── Company.ts
-├── utils/                    # Utility functions
-│   └── companyUtils.ts
-├── constants/                # Constants
-│   └── companyConstants.ts
-└── __tests__/                # Tests
-    ├── CompanyCard.test.tsx
-    └── useCompanies.test.ts
+└── types/                    # TypeScript type definitions
+    └── Company.ts
 ```
 
-### Example: Companies Module
+These modules only contain type definitions because the actual functionality is handled by the generic `object-record/` module.
+
+**Full-Featured Modules** (e.g., `activities/`, `auth/`, `views/`):
+```
+modules/activities/
+├── components/               # React components
+├── hooks/                    # Custom hooks
+├── states/                   # Recoil state
+├── graphql/                  # GraphQL queries/mutations
+├── types/                    # TypeScript types
+├── utils/                    # Utility functions
+└── ...                       # Other subdirectories as needed
+```
+
+**Example Module Structures:**
+
+The `action-menu/` module (full-featured):
+```
+modules/action-menu/
+├── actions/
+├── components/
+├── constants/
+├── contexts/
+├── hooks/
+├── mock/
+├── states/
+├── types/
+└── utils/
+```
+
+The `auth/` module (full-featured):
+```
+modules/auth/
+├── components/
+├── constants/
+├── contexts/
+├── graphql/
+├── hooks/
+├── services/
+├── sign-in-up/
+├── states/
+├── types/
+└── utils/
+```
+
+### Example: Type Definitions
 
 ```typescript
 // modules/companies/types/Company.ts
@@ -108,91 +124,46 @@ export interface Company {
   createdAt: string;
   updatedAt: string;
 }
-
-// modules/companies/states/companyState.ts
-import { atom } from 'recoil';
-
-export const selectedCompanyIdState = atom<string | null>({
-  key: 'selectedCompanyId',
-  default: null,
-});
-
-export const companyFiltersState = atom({
-  key: 'companyFilters',
-  default: {
-    industry: null,
-    minEmployees: null,
-  },
-});
-
-// modules/companies/hooks/useCompanies.ts
-import { useQuery } from '@apollo/client';
-import { GET_COMPANIES } from '../graphql/queries/getCompanies';
-
-export function useCompanies(filters?: CompanyFilters) {
-  const { data, loading, error } = useQuery(GET_COMPANIES, {
-    variables: { filter: filters },
-  });
-
-  return {
-    companies: data?.companies?.edges?.map(edge => edge.node) ?? [],
-    loading,
-    error,
-  };
-}
-
-// modules/companies/components/CompanyCard.tsx
-import { Company } from '../types/Company';
-
-interface CompanyCardProps {
-  company: Company;
-  onSelect?: (company: Company) => void;
-}
-
-export function CompanyCard({ company, onSelect }: CompanyCardProps) {
-  return (
-    <div onClick={() => onSelect?.(company)}>
-      <h3>{company.name}</h3>
-      <p>{company.industry}</p>
-      <p>{company.employees} employees</p>
-    </div>
-  );
-}
 ```
+
+Note: Companies, people, and opportunities are managed through the generic `object-record/` module, which provides CRUD operations for all object types. The specific modules only contain type definitions.
 
 ## Component Architecture
 
 ### Component Types
 
 **1. Page Components**
-Top-level route components:
+Top-level route components located in `src/pages/`:
 
 ```typescript
-// pages/companies/CompaniesPage.tsx
-export function CompaniesPage() {
+// pages/object-record/RecordIndexPage.tsx
+// This page handles all object types (companies, people, opportunities, etc.)
+export function RecordIndexPage() {
   return (
     <PageLayout>
-      <PageHeader title="Companies" />
-      <CompanyList />
+      <PageHeader />
+      <RecordIndexContainer />
     </PageLayout>
   );
 }
 ```
 
+Note: Twenty uses a generic object-record system, so there are no separate `pages/companies/` or `pages/people/` directories. All object types are handled through `pages/object-record/`.
+
 **2. Container Components**
-Handle data fetching and state:
+Handle data fetching and state (example from a full-featured module):
 
 ```typescript
-// modules/companies/components/CompanyListContainer.tsx
-export function CompanyListContainer() {
-  const { companies, loading } = useCompanies();
-  const [selectedId, setSelectedId] = useRecoilState(selectedCompanyIdState);
+// modules/activities/components/ActivityListContainer.tsx
+export function ActivityListContainer() {
+  const { activities, loading } = useActivities();
+  const [selectedId, setSelectedId] = useRecoilState(selectedActivityIdState);
 
   if (loading) return <Spinner />;
 
   return (
-    <CompanyList
-      companies={companies}
+    <ActivityList
+      activities={activities}
       selectedId={selectedId}
       onSelect={setSelectedId}
     />
@@ -201,27 +172,19 @@ export function CompanyListContainer() {
 ```
 
 **3. Presentational Components**
-Pure UI components:
+Pure UI components (generic example):
 
 ```typescript
-// modules/companies/components/CompanyList.tsx
-interface CompanyListProps {
-  companies: Company[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
+// modules/ui/layout/components/Card.tsx
+interface CardProps {
+  children: ReactNode;
+  className?: string;
 }
 
-export function CompanyList({ companies, selectedId, onSelect }: CompanyListProps) {
+export function Card({ children, className }: CardProps) {
   return (
-    <div>
-      {companies.map(company => (
-        <CompanyCard
-          key={company.id}
-          company={company}
-          selected={company.id === selectedId}
-          onSelect={() => onSelect(company.id)}
-        />
-      ))}
+    <div className={className}>
+      {children}
     </div>
   );
 }
@@ -232,14 +195,14 @@ export function CompanyList({ companies, selectedId, onSelect }: CompanyListProp
 **Composition Pattern:**
 
 ```typescript
-// Compose smaller components
-function CompanyDetails({ company }: { company: Company }) {
+// Compose smaller components (generic example)
+function RecordDetails({ record }: { record: Record }) {
   return (
     <Card>
-      <CompanyHeader company={company} />
-      <CompanyInfo company={company} />
-      <CompanyContacts company={company} />
-      <CompanyActivities company={company} />
+      <RecordHeader record={record} />
+      <RecordInfo record={record} />
+      <RecordRelations record={record} />
+      <RecordActivities record={record} />
     </Card>
   );
 }
@@ -260,9 +223,9 @@ function DataLoader<T>({
 }
 
 // Usage
-<DataLoader query={GET_COMPANIES}>
-  {(companies, loading) => (
-    loading ? <Spinner /> : <CompanyList companies={companies} />
+<DataLoader query={GET_RECORDS}>
+  {(records, loading) => (
+    loading ? <Spinner /> : <RecordList records={records} />
   )}
 </DataLoader>
 ```
@@ -282,7 +245,7 @@ function withAuth<P extends object>(Component: ComponentType<P>) {
 }
 
 // Usage
-export default withAuth(CompaniesPage);
+export default withAuth(SettingsPage);
 ```
 
 ## State Management
@@ -318,14 +281,14 @@ export const selectedIdsState = atom<string[]>({
 ```typescript
 import { atomFamily } from 'recoil';
 
-// State per entity ID
-export const companyState = atomFamily<Company | null, string>({
-  key: 'company',
+// State per entity ID (generic example)
+export const recordState = atomFamily<Record | null, string>({
+  key: 'record',
   default: null,
 });
 
 // Usage
-const [company, setCompany] = useRecoilState(companyState('company-123'));
+const [record, setRecord] = useRecoilState(recordState('record-123'));
 ```
 
 **Selectors (Derived State):**
@@ -333,21 +296,16 @@ const [company, setCompany] = useRecoilState(companyState('company-123'));
 ```typescript
 import { selector } from 'recoil';
 
-// Compute from other state
-export const filteredCompaniesSelector = selector({
-  key: 'filteredCompanies',
+// Compute from other state (generic example)
+export const filteredRecordsSelector = selector({
+  key: 'filteredRecords',
   get: ({ get }) => {
-    const companies = get(companiesState);
-    const filters = get(companyFiltersState);
+    const records = get(recordsState);
+    const filters = get(recordFiltersState);
 
-    return companies.filter(company => {
-      if (filters.industry && company.industry !== filters.industry) {
-        return false;
-      }
-      if (filters.minEmployees && company.employees < filters.minEmployees) {
-        return false;
-      }
-      return true;
+    return records.filter(record => {
+      // Apply filters
+      return matchesFilters(record, filters);
     });
   },
 });
@@ -356,10 +314,10 @@ export const filteredCompaniesSelector = selector({
 **Async Selectors:**
 
 ```typescript
-export const companySelector = selectorFamily({
-  key: 'companySelector',
+export const recordSelector = selectorFamily({
+  key: 'recordSelector',
   get: (id: string) => async ({ get }) => {
-    const response = await fetch(`/api/companies/${id}`);
+    const response = await fetch(`/api/records/${id}`);
     return response.json();
   },
 });
@@ -370,24 +328,15 @@ export const companySelector = selectorFamily({
 **Cache Configuration:**
 
 ```typescript
-// apollo-client.ts
+// apollo-client.ts (example configuration)
 import { InMemoryCache } from '@apollo/client';
 
 const cache = new InMemoryCache({
   typePolicies: {
     Query: {
       fields: {
-        companies: {
+        records: {
           keyArgs: ['filter'],
-          merge(existing, incoming) {
-            return incoming;
-          },
-        },
-      },
-    },
-    Company: {
-      fields: {
-        people: {
           merge(existing, incoming) {
             return incoming;
           },
@@ -403,14 +352,14 @@ const cache = new InMemoryCache({
 ```typescript
 import { useQuery } from '@apollo/client';
 
-function useCompany(id: string) {
-  const { data, loading, error, refetch } = useQuery(GET_COMPANY, {
+function useRecord(id: string) {
+  const { data, loading, error, refetch } = useQuery(GET_RECORD, {
     variables: { id },
     fetchPolicy: 'cache-first',
   });
 
   return {
-    company: data?.company,
+    record: data?.record,
     loading,
     error,
     refetch,
@@ -423,40 +372,40 @@ function useCompany(id: string) {
 ```typescript
 import { useMutation } from '@apollo/client';
 
-function useCreateCompany() {
-  const [createCompany, { loading, error }] = useMutation(CREATE_COMPANY, {
+function useCreateRecord() {
+  const [createRecord, { loading, error }] = useMutation(CREATE_RECORD, {
     update(cache, { data }) {
       cache.modify({
         fields: {
-          companies(existing = []) {
-            const newCompanyRef = cache.writeFragment({
-              data: data.createCompany,
+          records(existing = []) {
+            const newRecordRef = cache.writeFragment({
+              data: data.createRecord,
               fragment: gql`
-                fragment NewCompany on Company {
+                fragment NewRecord on Record {
                   id
                   name
                 }
               `,
             });
-            return [...existing, newCompanyRef];
+            return [...existing, newRecordRef];
           },
         },
       });
     },
   });
 
-  return { createCompany, loading, error };
+  return { createRecord, loading, error };
 }
 ```
 
 **Optimistic Updates:**
 
 ```typescript
-const [updateCompany] = useMutation(UPDATE_COMPANY, {
+const [updateRecord] = useMutation(UPDATE_RECORD, {
   optimisticResponse: {
-    updateCompany: {
-      __typename: 'Company',
-      id: companyId,
+    updateRecord: {
+      __typename: 'Record',
+      id: recordId,
       name: newName,
     },
   },
@@ -465,66 +414,54 @@ const [updateCompany] = useMutation(UPDATE_COMPANY, {
 
 ## Custom Hooks
 
+Custom hooks are located in module-specific `hooks/` directories or in the global `src/hooks/` directory.
+
 ### Data Fetching Hooks
 
 ```typescript
-// useCompanies.ts
-export function useCompanies(options?: UseCompaniesOptions) {
-  const { data, loading, error, refetch } = useQuery(GET_COMPANIES, {
+// Example from object-record module
+export function useRecords(options?: UseRecordsOptions) {
+  const { data, loading, error, refetch } = useQuery(GET_RECORDS, {
     variables: { filter: options?.filter },
     skip: options?.skip,
   });
 
-  const companies = useMemo(
-    () => data?.companies?.edges?.map(edge => edge.node) ?? [],
+  const records = useMemo(
+    () => data?.records?.edges?.map(edge => edge.node) ?? [],
     [data]
   );
 
-  return { companies, loading, error, refetch };
-}
-
-// useCompany.ts
-export function useCompany(id: string) {
-  const { data, loading, error } = useQuery(GET_COMPANY, {
-    variables: { id },
-    skip: !id,
-  });
-
-  return {
-    company: data?.company,
-    loading,
-    error,
-  };
+  return { records, loading, error, refetch };
 }
 ```
 
 ### Mutation Hooks
 
 ```typescript
-// useCreateCompany.ts
-export function useCreateCompany() {
-  const [createMutation, { loading, error }] = useMutation(CREATE_COMPANY);
+// Example mutation hook
+export function useCreateRecord() {
+  const [createMutation, { loading, error }] = useMutation(CREATE_RECORD);
 
-  const createCompany = useCallback(
-    async (input: CompanyCreateInput) => {
+  const createRecord = useCallback(
+    async (input: RecordCreateInput) => {
       const { data } = await createMutation({
         variables: { data: input },
       });
-      return data?.createCompany;
+      return data?.createRecord;
     },
     [createMutation]
   );
 
-  return { createCompany, loading, error };
+  return { createRecord, loading, error };
 }
 ```
 
 ### State Hooks
 
 ```typescript
-// useCompanyFilters.ts
-export function useCompanyFilters() {
-  const [filters, setFilters] = useRecoilState(companyFiltersState);
+// Example state management hook
+export function useRecordFilters() {
+  const [filters, setFilters] = useRecoilState(recordFiltersState);
 
   const updateFilter = useCallback(
     (key: string, value: any) => {
@@ -576,93 +513,182 @@ export function useDebounce<T>(value: T, delay: number): T {
 
 ### Route Configuration
 
-```typescript
-// router.tsx
-import { createBrowserRouter } from 'react-router-dom';
+Twenty uses React Router v6 with routes configured via the `useCreateAppRouter` hook in `src/modules/app/hooks/useCreateAppRouter.tsx`:
 
-export const router = createBrowserRouter([
-  {
-    path: '/',
-    element: <AppLayout />,
-    children: [
-      {
-        index: true,
-        element: <Navigate to="/companies" />,
-      },
-      {
-        path: 'companies',
-        element: <CompaniesPage />,
-      },
-      {
-        path: 'companies/:id',
-        element: <CompanyDetailsPage />,
-      },
-      {
-        path: 'people',
-        element: <PeoplePage />,
-      },
-      {
-        path: 'settings',
-        element: <SettingsLayout />,
-        children: [
-          {
-            path: 'profile',
-            element: <ProfileSettings />,
-          },
-          {
-            path: 'workspace',
-            element: <WorkspaceSettings />,
-          },
-        ],
-      },
-    ],
-  },
-  {
-    path: '/auth',
-    element: <AuthLayout />,
-    children: [
-      {
-        path: 'login',
-        element: <LoginPage />,
-      },
-      {
-        path: 'signup',
-        element: <SignupPage />,
-      },
-    ],
-  },
-  {
-    path: '*',
-    element: <NotFoundPage />,
-  },
-]);
+```typescript
+// Simplified example of route structure
+import { createBrowserRouter, createRoutesFromElements, Route } from 'react-router-dom';
+
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route element={<AppLayout />}>
+      {/* Object record routes (companies, people, opportunities, etc.) */}
+      <Route path="/objects/:objectNamePlural" element={<RecordIndexPage />} />
+      <Route path="/object/:objectNameSingular/:objectRecordId" element={<RecordShowPage />} />
+
+      {/* Settings routes */}
+      <Route path="/settings/*" element={<SettingsLayout />} />
+
+      {/* Auth routes */}
+      <Route path="/verify" element={<Authorize />} />
+      <Route path="/sign-in" element={<SignInUp />} />
+      <Route path="/sign-up" element={<SignInUp />} />
+
+      {/* Onboarding routes */}
+      <Route path="/create/workspace" element={<CreateWorkspace />} />
+      <Route path="/create/profile" element={<CreateProfile />} />
+
+      {/* 404 */}
+      <Route path="*" element={<NotFound />} />
+    </Route>
+  )
+);
 ```
+
+Note: Twenty uses a generic object-record system, so routes like `/objects/companies` and `/objects/people` are handled by the same `RecordIndexPage` component, with the object type determined from the URL parameter.
 
 ### Navigation
 
 ```typescript
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
-function CompanyCard({ company }: { company: Company }) {
+function RecordCard({ record }: { record: Record }) {
   const navigate = useNavigate();
 
   const handleClick = () => {
-    navigate(`/companies/${company.id}`);
+    navigate(`/object/${record.objectNameSingular}/${record.id}`);
   };
 
-  return <div onClick={handleClick}>{company.name}</div>;
+  return <div onClick={handleClick}>{record.name}</div>;
 }
 
-function CompanyDetailsPage() {
-  const { id } = useParams<{ id: string }>();
+function RecordShowPage() {
+  const { objectNameSingular, objectRecordId } = useParams();
   const [searchParams] = useSearchParams();
   const tab = searchParams.get('tab') ?? 'overview';
 
-  return <CompanyDetails id={id!} activeTab={tab} />;
+  return <RecordDetails id={objectRecordId!} activeTab={tab} />;
 }
 ```
 
 ## Styling
+
+Twenty uses a combination of styling approaches:
+- **twenty-ui**: Shared component library with pre-built UI components
+- **Emotion**: CSS-in-JS for custom component styling
+- **Linaria**: Zero-runtime CSS for performance-critical styles
+
+### twenty-ui Component Library
+
+Twenty maintains a separate `twenty-ui` package that provides reusable UI components, theming, and utilities shared across the application. This design system ensures consistency and reduces code duplication.
+
+**Package Structure:**
+```
+packages/twenty-ui/src/
+├── accessibility/        # Accessibility utilities
+├── assets/              # Icons, themes, and static assets
+├── components/          # Composite components (Chip, Tag, Pill, etc.)
+├── display/             # Display components (Avatar, Icon, Tooltip, etc.)
+├── feedback/            # Feedback components (Loader, ProgressBar)
+├── input/               # Input components (Button, CodeEditor, etc.)
+├── json-visualizer/     # JSON visualization components
+├── layout/              # Layout components (Card, Section, etc.)
+├── navigation/          # Navigation components (Menu, Link, etc.)
+├── testing/             # Testing utilities and decorators
+├── theme/               # Theme system and constants
+└── utilities/           # Utility functions and hooks
+```
+
+**Importing from twenty-ui:**
+
+The package uses subpath exports for tree-shaking and better organization:
+
+```typescript
+// Import specific categories
+import { IconSearch, Avatar, Tooltip } from 'twenty-ui/display';
+import { Button, IconButton, Toggle } from 'twenty-ui/input';
+import { MenuItem, MenuItemSelect } from 'twenty-ui/navigation';
+import { Card, Section } from 'twenty-ui/layout';
+import { Loader, CircularProgressBar } from 'twenty-ui/feedback';
+import { Chip, Tag, Pill } from 'twenty-ui/components';
+import { MOBILE_VIEWPORT } from 'twenty-ui/theme';
+import { useIsMobile, getOsControlSymbol } from 'twenty-ui/utilities';
+
+// Import styles (done once in index.tsx)
+import 'twenty-ui/style.css';
+```
+
+**Common twenty-ui Components Used in twenty-front:**
+
+1. **Display Components:**
+   - `IconSearch`, `IconX`, `IconChevronDown`, etc. - Tabler icons
+   - `Avatar` - User/workspace avatars
+   - `Tooltip`, `AppTooltip` - Tooltips with various positions
+   - `Label` - Text labels
+   - `AnimatedCheckmark` - Animated checkmark for success states
+   - `OverflowingTextWithTooltip` - Text with ellipsis and tooltip
+
+2. **Input Components:**
+   - `Button`, `MainButton` - Primary action buttons
+   - `IconButton`, `LightIconButton` - Icon-only buttons
+   - `Toggle`, `Checkbox`, `Radio`, `RadioGroup` - Form controls
+   - `CodeEditor` - Monaco-based code editor
+
+3. **Navigation Components:**
+   - `MenuItem`, `MenuItemSelect`, `MenuItemSelectTag` - Menu items
+   - `NavigationBar` - Top navigation bar
+   - `AdvancedSettingsToggle` - Settings toggle component
+   - `UndecoratedLink` - Unstyled router links
+
+4. **Layout Components:**
+   - `Card` - Container with elevation
+   - `Section` - Content sections
+   - `AnimatedExpandableContainer` - Collapsible containers
+
+5. **Feedback Components:**
+   - `Loader` - Loading spinner
+   - `CircularProgressBar` - Progress indicator
+   - `Banner` - Information banners
+
+6. **Composite Components:**
+   - `Chip`, `Tag`, `Pill` - Label-like components with colors
+
+**Theme Integration:**
+
+twenty-ui provides theme constants and utilities:
+
+```typescript
+import { MOBILE_VIEWPORT } from 'twenty-ui/theme';
+
+const StyledContainer = styled.div`
+  @media (max-width: ${MOBILE_VIEWPORT}px) {
+    padding: 8px;
+  }
+`;
+```
+
+**Utility Hooks:**
+
+```typescript
+import { useIsMobile } from 'twenty-ui/utilities';
+
+function MyComponent() {
+  const isMobile = useIsMobile();
+
+  return isMobile ? <MobileView /> : <DesktopView />;
+}
+```
+
+**Testing Utilities:**
+
+```typescript
+import { ComponentDecorator, CatalogDecorator } from 'twenty-ui/testing';
+
+// Use in Storybook stories
+export default {
+  decorators: [ComponentDecorator],
+};
+```
 
 ### Emotion (CSS-in-JS)
 
@@ -787,16 +813,16 @@ import { ThemeProvider } from '@emotion/react';
 ```typescript
 import { lazy, Suspense } from 'react';
 
-// Lazy load components
-const CompaniesPage = lazy(() => import('./pages/companies/CompaniesPage'));
-const PeoplePage = lazy(() => import('./pages/people/PeoplePage'));
+// Lazy load page components
+const RecordIndexPage = lazy(() => import('./pages/object-record/RecordIndexPage'));
+const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'));
 
 function App() {
   return (
     <Suspense fallback={<Spinner />}>
       <Routes>
-        <Route path="/companies" element={<CompaniesPage />} />
-        <Route path="/people" element={<PeoplePage />} />
+        <Route path="/objects/:objectNamePlural" element={<RecordIndexPage />} />
+        <Route path="/settings/*" element={<SettingsPage />} />
       </Routes>
     </Suspense>
   );
@@ -809,15 +835,15 @@ function App() {
 import { memo, useMemo, useCallback } from 'react';
 
 // Memoize component
-const CompanyCard = memo(function CompanyCard({ company }: { company: Company }) {
-  return <div>{company.name}</div>;
+const RecordCard = memo(function RecordCard({ record }: { record: Record }) {
+  return <div>{record.name}</div>;
 });
 
 // Memoize expensive computation
-function CompanyList({ companies }: { companies: Company[] }) {
-  const sortedCompanies = useMemo(
-    () => [...companies].sort((a, b) => a.name.localeCompare(b.name)),
-    [companies]
+function RecordList({ records }: { records: Record[] }) {
+  const sortedRecords = useMemo(
+    () => [...records].sort((a, b) => a.name.localeCompare(b.name)),
+    [records]
   );
 
   const handleSelect = useCallback((id: string) => {
@@ -826,10 +852,10 @@ function CompanyList({ companies }: { companies: Company[] }) {
 
   return (
     <div>
-      {sortedCompanies.map(company => (
-        <CompanyCard
-          key={company.id}
-          company={company}
+      {sortedRecords.map(record => (
+        <RecordCard
+          key={record.id}
+          record={record}
           onSelect={handleSelect}
         />
       ))}
@@ -843,11 +869,11 @@ function CompanyList({ companies }: { companies: Company[] }) {
 ```typescript
 import { useVirtualizer } from '@tanstack/react-virtual';
 
-function VirtualCompanyList({ companies }: { companies: Company[] }) {
+function VirtualRecordList({ records }: { records: Record[] }) {
   const parentRef = useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({
-    count: companies.length,
+    count: records.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 60,
   });
@@ -867,7 +893,7 @@ function VirtualCompanyList({ companies }: { companies: Company[] }) {
               transform: `translateY(${virtualItem.start}px)`,
             }}
           >
-            <CompanyCard company={companies[virtualItem.index]} />
+            <RecordCard record={records[virtualItem.index]} />
           </div>
         ))}
       </div>
@@ -922,31 +948,31 @@ export class ErrorBoundary extends Component<Props, State> {
 ### Query Error Handling
 
 ```typescript
-function CompanyList() {
-  const { companies, loading, error } = useCompanies();
+function RecordList() {
+  const { records, loading, error } = useRecords();
 
   if (loading) return <Spinner />;
   if (error) return <ErrorMessage error={error} />;
 
-  return <div>{/* Render companies */}</div>;
+  return <div>{/* Render records */}</div>;
 }
 ```
 
 ## Testing
 
-See [Frontend Testing Guide](./16-frontend-testing.md) for detailed testing strategies.
+See [Frontend Testing Guide](./13-frontend-testing.md) for detailed testing strategies.
 
 ## Next Steps
 
-- [Component Guidelines](./08-component-guidelines.md)
-- [State Management](./09-state-management.md)
-- [Styling Guide](./10-styling-guide.md)
-- [Frontend Testing](./16-frontend-testing.md)
+- [Component Guidelines](./06-component-guidelines.md)
+- [State Management](./07-state-management.md)
+- [Backend Architecture](./08-backend-architecture.md)
+- [Frontend Testing](./13-frontend-testing.md)
 
 ---
 
 **Related Documentation:**
-- [System Architecture](./04-system-architecture.md)
-- [Technology Stack](./06-technology-stack.md)
-- [Backend Architecture](./11-backend-architecture.md)
+- [System Architecture](./02-system-architecture.md)
+- [Monorepo Structure](./03-monorepo-structure.md)
+- [Technology Stack](./04-technology-stack.md)
 

@@ -2,7 +2,7 @@
 
 Comprehensive guide to Twenty's backend architecture, built with NestJS, GraphQL, and PostgreSQL.
 
-##iew
+## Overview
 
 Twenty's backend is built with:
 - **NestJS** - TypeScript framework
@@ -10,8 +10,8 @@ Twenty's backend is built with:
 - **TypeORM** - Database ORM
 - **TwentyORM** - Custom workspace-aware ORM
 - **PostgreSQL** - Primary database
-- **Redis** - Caching and job queue
-- **BullMQ** - Job processing
+- **Redis** - Caching and session storage
+- **BullMQ** - Job processing (via custom MessageQueue abstraction)
 
 ## Project Structure
 
@@ -22,42 +22,54 @@ packages/twenty-server/
 │   │   ├── api/                   # GraphQL API layer
 │   │   │   ├── graphql/           # GraphQL setup
 │   │   │   ├── rest/              # REST API
-│   │   │   └── websocket/         # WebSocket support
-│   │   ├── metadata/              # Metadata management
-│   │   │   ├── metadata-engine/   # Metadata engine
+│   │   │   ├── mcp/               # Model Context Protocol
+│   │   │   └── common/            # Common API utilities
+│   │   ├── metadata-modules/      # Metadata management
 │   │   │   ├── object-metadata/   # Object definitions
-│   │   │   └── field-metadata/    # Field definitions
-│   │   ├── workspace/             # Workspace management
-│   │   │   ├── workspace-manager/ # Workspace operations
-│   │   │   ├── workspace-schema/  # Schema management
-│   │   │   └── workspace-query/   # Query builder
+│   │   │   ├── field-metadata/    # Field definitions
+│   │   │   ├── data-source/       # Data source management
+│   │   │   └── ...                # Many other metadata modules
+│   │   ├── workspace-manager/     # Workspace management
+│   │   ├── workspace-datasource/  # Workspace data source
+│   │   ├── workspace-cache/       # Workspace caching
 │   │   ├── twenty-orm/            # Custom ORM
 │   │   │   ├── repository/        # Repository pattern
-│   │   │   ├── query-builder/     # Query builder
+│   │   │   ├── entity-manager/    # Entity manager
 │   │   │   └── decorators/        # ORM decorators
-│   │   └── core-modules/          # Core modules
+│   │   ├── core-modules/          # Core modules
+│   │   │   ├── auth/              # Authentication
+│   │   │   ├── user/              # User management
+│   │   │   ├── workspace/         # Workspace operations
+│   │   │   ├── messaging/         # Email/messaging
+│   │   │   ├── calendar/          # Calendar integration
+│   │   │   ├── file/              # File management
+│   │   │   ├── webhook/           # Webhooks
+│   │   │   ├── message-queue/     # Job queue abstraction
+│   │   │   └── ...                # Many other core modules
+│   │   ├── decorators/            # Custom decorators
+│   │   │   ├── auth/              # Auth decorators
+│   │   │   ├── metadata/          # Metadata decorators
+│   │   │   └── observability/     # Observability decorators
+│   │   ├── guards/                # Auth guards
+│   │   ├── middlewares/           # Middlewares
+│   │   └── utils/                 # Engine utilities
 │   ├── modules/                   # Business logic modules
-│   │   ├── auth/                  # Authentication
-│   │   ├── user/                  # User management
-│   │   ├── workspace/             # Workspace operations
+│   │   ├── company/               # Company module
+│   │   ├── person/                # Person module
+│   │   ├── opportunity/           # Opportunity module
 │   │   ├── workflow/              # Workflow automation
-│   │   ├── messaging/             # Email/messaging
-│   │   ├── calendar/              # Calendar integration
-│   │   ├── file/                  # File management
-│   │   ├── webhook/               # Webhooks
-│   │   └── ...
+│   │   ├── messaging/             # Messaging module
+│   │   ├── calendar/              # Calendar module
+│   │   └── ...                    # Other business modules
 │   ├── database/                  # Database layer
-│   │   ├── migrations/            # TypeORM migrations
-│   │   ├── seeds/                 # Database seeds
-│   │   └── typeorm.config.ts      # TypeORM configuration
-│   ├── integrations/              # External integrations
-│   │   ├── google/                # Google integration
-│   │   ├── microsoft/             # Microsoft integration
-│   │   └── ...
+│   │   ├── typeorm/               # TypeORM configuration
+│   │   │   └── core/              # Core database
+│   │   │       └── migrations/    # TypeORM migrations
+│   │   ├── clickHouse/            # ClickHouse database
+│   │   └── commands/              # Database commands
+│   ├── command/                   # CLI commands
+│   ├── queue-worker/              # Queue worker entry point
 │   ├── utils/                     # Utility functions
-│   ├── decorators/                # Custom decorators
-│   ├── guards/                    # Auth guards
-│   ├── interceptors/              # Interceptors
 │   ├── filters/                   # Exception filters
 │   ├── app.module.ts              # Root module
 │   └── main.ts                    # Application entry
@@ -70,8 +82,10 @@ packages/twenty-server/
 
 ### NestJS Module Pattern
 
+Note: The example below shows a typical NestJS module pattern. In Twenty's actual codebase, most business logic modules (like company, person, opportunity) are defined as standard objects in the metadata system rather than traditional NestJS modules. Core functionality is in `src/engine/core-modules/`.
+
 ```typescript
-// modules/company/company.module.ts
+// Example NestJS module pattern (used in core-modules)
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
@@ -92,8 +106,10 @@ export class CompanyModule {}
 
 ### Service Layer
 
+Note: This is a conceptual example. Twenty uses a metadata-driven approach where most CRUD operations are handled through the metadata engine and TwentyORM.
+
 ```typescript
-// modules/company/company.service.ts
+// Example service pattern
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -152,20 +168,23 @@ export class CompanyService {
 
 ### GraphQL Resolver
 
+Note: This is a conceptual example. Twenty's GraphQL resolvers are dynamically generated through the metadata engine.
+
 ```typescript
-// modules/company/company.resolver.ts
+// Example resolver pattern
 import { Resolver, Query, Mutation, Args } from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
+import { AuthWorkspace } from 'src/engine/decorators/auth/auth-workspace.decorator';
 
 @Resolver(() => Company)
-@UseGuards(JwtAuthGuard, WorkspaceGuard)
+@UseGuards(JwtAuthGuard, WorkspaceAuthGuard)
 export class CompanyResolver {
   constructor(private companyService: CompanyService) {}
 
   @Query(() => [Company])
   async companies(
     @Args('filter', { nullable: true }) filter?: CompanyFilter,
-    @Workspace() workspace: WorkspaceEntity,
+    @AuthWorkspace() workspace: Workspace,
   ): Promise<Company[]> {
     return this.companyService.findAll(workspace.id, filter);
   }
@@ -173,7 +192,7 @@ export class CompanyResolver {
   @Query(() => Company)
   async company(
     @Args('id') id: string,
-    @Workspace() workspace: WorkspaceEntity,
+    @AuthWorkspace() workspace: Workspace,
   ): Promise<Company> {
     return this.companyService.findOne(id, workspace.id);
   }
@@ -181,7 +200,7 @@ export class CompanyResolver {
   @Mutation(() => Company)
   async createCompany(
     @Args('data') data: CreateCompanyInput,
-    @Workspace() workspace: WorkspaceEntity,
+    @AuthWorkspace() workspace: Workspace,
   ): Promise<Company> {
     return this.companyService.create(data, workspace.id);
   }
@@ -190,7 +209,7 @@ export class CompanyResolver {
   async updateCompany(
     @Args('id') id: string,
     @Args('data') data: UpdateCompanyInput,
-    @Workspace() workspace: WorkspaceEntity,
+    @AuthWorkspace() workspace: Workspace,
   ): Promise<Company> {
     return this.companyService.update(id, data, workspace.id);
   }
@@ -198,7 +217,7 @@ export class CompanyResolver {
   @Mutation(() => Boolean)
   async deleteCompany(
     @Args('id') id: string,
-    @Workspace() workspace: WorkspaceEntity,
+    @AuthWorkspace() workspace: Workspace,
   ): Promise<boolean> {
     return this.companyService.delete(id, workspace.id);
   }
@@ -207,7 +226,7 @@ export class CompanyResolver {
   @ResolveField(() => [Person])
   async people(
     @Parent() company: Company,
-    @Workspace() workspace: WorkspaceEntity,
+    @AuthWorkspace() workspace: Workspace,
   ): Promise<Person[]> {
     return this.personService.findByCompany(company.id, workspace.id);
   }
@@ -216,24 +235,27 @@ export class CompanyResolver {
 
 ### REST Controller (Optional)
 
+Note: This is a conceptual example. Twenty primarily uses GraphQL for its API.
+
 ```typescript
-// modules/company/company.controller.ts
+// Example REST controller pattern
 import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
+import { AuthWorkspace } from 'src/engine/decorators/auth/auth-workspace.decorator';
 
 @Controller('companies')
-@UseGuards(JwtAuthGuard, WorkspaceGuard)
+@UseGuards(JwtAuthGuard, WorkspaceAuthGuard)
 export class CompanyController {
   constructor(private companyService: CompanyService) {}
 
   @Get()
-  async findAll(@Workspace() workspace: WorkspaceEntity) {
+  async findAll(@AuthWorkspace() workspace: Workspace) {
     return this.companyService.findAll(workspace.id);
   }
 
   @Get(':id')
   async findOne(
     @Param('id') id: string,
-    @Workspace() workspace: WorkspaceEntity,
+    @AuthWorkspace() workspace: Workspace,
   ) {
     return this.companyService.findOne(id, workspace.id);
   }
@@ -241,7 +263,7 @@ export class CompanyController {
   @Post()
   async create(
     @Body() data: CreateCompanyDto,
-    @Workspace() workspace: WorkspaceEntity,
+    @AuthWorkspace() workspace: Workspace,
   ) {
     return this.companyService.create(data, workspace.id);
   }
@@ -250,7 +272,7 @@ export class CompanyController {
   async update(
     @Param('id') id: string,
     @Body() data: UpdateCompanyDto,
-    @Workspace() workspace: WorkspaceEntity,
+    @AuthWorkspace() workspace: Workspace,
   ) {
     return this.companyService.update(id, data, workspace.id);
   }
@@ -258,7 +280,7 @@ export class CompanyController {
   @Delete(':id')
   async delete(
     @Param('id') id: string,
-    @Workspace() workspace: WorkspaceEntity,
+    @AuthWorkspace() workspace: Workspace,
   ) {
     return this.companyService.delete(id, workspace.id);
   }
@@ -269,8 +291,10 @@ export class CompanyController {
 
 ### TypeORM Entities
 
+Note: This is a conceptual example. Twenty uses a metadata-driven approach where entities are dynamically generated.
+
 ```typescript
-// database/entities/company.entity.ts
+// Example entity pattern
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('companies')
@@ -312,8 +336,10 @@ export class Company {
 
 ### Repository Pattern
 
+Note: This is a conceptual example showing TypeORM repository pattern.
+
 ```typescript
-// modules/company/company.repository.ts
+// Example repository pattern
 import { Injectable } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 
@@ -359,39 +385,27 @@ export class CompanyRepository extends Repository<Company> {
 
 ### TwentyORM (Custom ORM)
 
+Twenty uses a custom ORM built on top of TypeORM that provides workspace-aware data access.
+
 ```typescript
-// engine/twenty-orm/twenty-orm.service.ts
-import { Injectable } from '@nestjs/common';
+// Example TwentyORM usage pattern
+// Actual implementation is in src/engine/twenty-orm/
 
-@Injectable()
-export class TwentyORM {
-  constructor(
-    private dataSource: DataSource,
-    private metadataService: MetadataService,
-  ) {}
-
-  workspace(workspaceId: string) {
-    return new WorkspaceQueryBuilder(
-      this.dataSource,
-      this.metadataService,
-      workspaceId,
-    );
-  }
-}
-
-// Usage
+// Usage example
 const companies = await twentyOrm
-  .workspace(workspaceId)
-  .findMany('company', {
+  .getRepository('company')
+  .find({
     where: { industry: 'Technology' },
-    include: { people: true },
   });
 ```
 
 ### Migrations
 
+Migrations are located in `src/database/typeorm/core/migrations/`.
+
 ```typescript
-// database/migrations/1234567890-CreateCompanies.ts
+// Example migration pattern
+// Actual migrations in src/database/typeorm/core/migrations/
 import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
 export class CreateCompanies1234567890 implements MigrationInterface {
@@ -476,8 +490,10 @@ export class CreateCompanies1234567890 implements MigrationInterface {
 
 ### Type Definitions
 
+Note: This is a conceptual example. Twenty's GraphQL types are dynamically generated through the metadata engine.
+
 ```typescript
-// modules/company/dto/company.object.ts
+// Example GraphQL object type
 import { ObjectType, Field, ID, Int } from '@nestjs/graphql';
 
 @ObjectType()
@@ -510,8 +526,10 @@ export class Company {
 
 ### Input Types
 
+Note: This is a conceptual example. Twenty's GraphQL input types are dynamically generated.
+
 ```typescript
-// modules/company/dto/create-company.input.ts
+// Example input types
 import { InputType, Field, Int } from '@nestjs/graphql';
 import { IsString, IsOptional, IsInt, Min } from 'class-validator';
 
@@ -565,8 +583,10 @@ export class UpdateCompanyInput {
 
 ### Filter Types
 
+Note: This is a conceptual example. Twenty's filter system is more sophisticated and handled through the metadata engine.
+
 ```typescript
-// modules/company/dto/company-filter.input.ts
+// Example filter types
 import { InputType, Field, Int } from '@nestjs/graphql';
 
 @InputType()
@@ -628,8 +648,10 @@ export class IntFilter {
 
 ### JWT Strategy
 
+Located in `src/engine/core-modules/auth/strategies/jwt.auth.strategy.ts`.
+
 ```typescript
-// modules/auth/strategies/jwt.strategy.ts
+// Example JWT strategy pattern
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
@@ -656,8 +678,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
 ### Auth Guards
 
+Guards are located in `src/engine/guards/`.
+
 ```typescript
-// guards/jwt-auth.guard.ts
+// Example JWT auth guard
+// Actual implementation in src/engine/guards/jwt-auth.guard.ts
 import { Injectable, ExecutionContext } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { GqlExecutionContext } from '@nestjs/graphql';
@@ -670,9 +695,10 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   }
 }
 
-// guards/workspace.guard.ts
+// Example workspace auth guard
+// Actual implementation in src/engine/guards/workspace-auth.guard.ts
 @Injectable()
-export class WorkspaceGuard implements CanActivate {
+export class WorkspaceAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const ctx = GqlExecutionContext.create(context);
     const { req } = ctx.getContext();
@@ -691,20 +717,24 @@ export class WorkspaceGuard implements CanActivate {
 
 ### Custom Decorators
 
+Decorators are located in `src/engine/decorators/auth/`.
+
 ```typescript
-// decorators/workspace.decorator.ts
+// Example workspace decorator
+// Actual implementation in src/engine/decorators/auth/auth-workspace.decorator.ts
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import { GqlExecutionContext } from '@nestjs/graphql';
 
-export const Workspace = createParamDecorator(
+export const AuthWorkspace = createParamDecorator(
   (data: unknown, context: ExecutionContext) => {
     const ctx = GqlExecutionContext.create(context);
     return ctx.getContext().req.workspace;
   },
 );
 
-// decorators/current-user.decorator.ts
-export const CurrentUser = createParamDecorator(
+// Example current user decorator
+// Actual implementation in src/engine/decorators/auth/auth-user.decorator.ts
+export const AuthUser = createParamDecorator(
   (data: unknown, context: ExecutionContext) => {
     const ctx = GqlExecutionContext.create(context);
     return ctx.getContext().req.user;
@@ -714,47 +744,50 @@ export const CurrentUser = createParamDecorator(
 
 ## Job Queue (BullMQ)
 
+Twenty uses BullMQ for job processing through a custom MessageQueue abstraction located in `src/engine/core-modules/message-queue/`.
+
 ### Queue Setup
 
 ```typescript
-// modules/email/email-queue.module.ts
-import { BullModule } from '@nestjs/bull';
+// Example message queue usage
+// Actual implementation in src/engine/core-modules/message-queue/
+import { MessageQueueModule } from 'src/engine/core-modules/message-queue/message-queue.module';
 
 @Module({
   imports: [
-    BullModule.registerQueue({
-      name: 'email',
+    MessageQueueModule.register({
+      driver: 'bullmq',
+      // configuration
     }),
   ],
-  providers: [EmailProcessor, EmailService],
-  exports: [BullModule],
+  providers: [EmailService],
 })
-export class EmailQueueModule {}
+export class EmailModule {}
 ```
 
 ### Producer
 
 ```typescript
-// modules/email/email.service.ts
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
+// Example job producer using MessageQueueService
+import { Injectable } from '@nestjs/common';
+import { MessageQueueService } from 'src/engine/core-modules/message-queue/services/message-queue.service';
 
 @Injectable()
 export class EmailService {
   constructor(
-    @InjectQueue('email') private emailQueue: Queue,
+    private messageQueueService: MessageQueueService,
   ) {}
 
   async sendWelcomeEmail(user: User): Promise<void> {
-    await this.emailQueue.add('welcome', {
+    await this.messageQueueService.add('welcome-email', {
       email: user.email,
       name: user.name,
     });
   }
 
   async sendPasswordReset(user: User, token: string): Promise<void> {
-    await this.emailQueue.add(
-      'password-reset',
+    await this.messageQueueService.add(
+      'password-reset-email',
       {
         email: user.email,
         token,
@@ -774,16 +807,16 @@ export class EmailService {
 ### Consumer
 
 ```typescript
-// modules/email/email.processor.ts
-import { Process, Processor } from '@nestjs/bull';
-import { Job } from 'bull';
+// Example job consumer
+// Jobs are processed using the @Processor decorator pattern
+import { Processor, Process } from 'src/engine/core-modules/message-queue/decorators/processor.decorator';
 
-@Processor('email')
+@Processor('email-queue')
 export class EmailProcessor {
   constructor(private emailSender: EmailSender) {}
 
-  @Process('welcome')
-  async handleWelcomeEmail(job: Job) {
+  @Process('welcome-email')
+  async handleWelcomeEmail(job: { data: { email: string; name: string } }) {
     const { email, name } = job.data;
 
     await this.emailSender.send({
@@ -794,8 +827,8 @@ export class EmailProcessor {
     });
   }
 
-  @Process('password-reset')
-  async handlePasswordReset(job: Job) {
+  @Process('password-reset-email')
+  async handlePasswordReset(job: { data: { email: string; token: string } }) {
     const { email, token } = job.data;
 
     await this.emailSender.send({
@@ -810,37 +843,34 @@ export class EmailProcessor {
 
 ## Caching
 
+Twenty uses Redis for caching through the cache-storage module in `src/engine/core-modules/cache-storage/`.
+
 ### Redis Cache
 
 ```typescript
-// modules/cache/cache.module.ts
-import { CacheModule } from '@nestjs/cache-manager';
-import * as redisStore from 'cache-manager-redis-store';
+// Example cache module setup
+// Actual implementation in src/engine/core-modules/cache-storage/
+import { CacheStorageModule } from 'src/engine/core-modules/cache-storage/cache-storage.module';
 
 @Module({
   imports: [
-    CacheModule.register({
-      store: redisStore,
-      host: process.env.REDIS_HOST,
-      port: process.env.REDIS_PORT,
-      ttl: 60 * 60, // 1 hour
-    }),
+    CacheStorageModule,
   ],
 })
-export class AppCacheModule {}
+export class AppModule {}
 ```
 
 ### Cache Usage
 
 ```typescript
-// modules/company/company.service.ts
-import { CACHE_MANAGER, Inject } from '@nestjs/common';
-import { Cache } from 'cache-manager';
+// Example cache usage pattern
+import { Injectable, Inject } from '@nestjs/common';
+import { CacheStorageService } from 'src/engine/core-modules/cache-storage/cache-storage.service';
 
 @Injectable()
 export class CompanyService {
   constructor(
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private cacheStorageService: CacheStorageService,
     private companyRepository: CompanyRepository,
   ) {}
 
@@ -848,7 +878,7 @@ export class CompanyService {
     const cacheKey = `company:${workspaceId}:${id}`;
 
     // Try cache first
-    const cached = await this.cacheManager.get<Company>(cacheKey);
+    const cached = await this.cacheStorageService.get<Company>(cacheKey);
     if (cached) return cached;
 
     // Fetch from database
@@ -857,7 +887,7 @@ export class CompanyService {
     });
 
     // Store in cache
-    await this.cacheManager.set(cacheKey, company, { ttl: 300 });
+    await this.cacheStorageService.set(cacheKey, company, 300);
 
     return company;
   }
@@ -874,7 +904,7 @@ export class CompanyService {
 
     // Invalidate cache
     const cacheKey = `company:${workspaceId}:${id}`;
-    await this.cacheManager.del(cacheKey);
+    await this.cacheStorageService.del(cacheKey);
 
     return company;
   }
@@ -883,10 +913,12 @@ export class CompanyService {
 
 ## WebSocket Support
 
+Note: This section describes a conceptual WebSocket implementation. Verify actual implementation in the codebase.
+
 ### Gateway
 
 ```typescript
-// modules/realtime/realtime.gateway.ts
+// Example WebSocket gateway pattern
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -928,10 +960,13 @@ export class RealtimeGateway
 
 ## Error Handling
 
+Exception filters are located in `src/filters/`.
+
 ### Exception Filters
 
 ```typescript
-// filters/http-exception.filter.ts
+// Example exception filter
+// Actual implementation in src/filters/unhandled-exception.filter.ts
 import {
   ExceptionFilter,
   Catch,
@@ -959,10 +994,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
 ## Logging
 
+Logging is handled through the logger module in `src/engine/core-modules/logger/`.
+
 ### Logger Service
 
 ```typescript
-// utils/logger.service.ts
+// Example logger usage
+// Actual implementation in src/engine/core-modules/logger/
 import { Injectable, LoggerService } from '@nestjs/common';
 
 @Injectable()
@@ -991,19 +1029,19 @@ export class CustomLogger implements LoggerService {
 
 ## Testing
 
-See [Backend Testing Guide](./17-backend-testing.md) for detailed testing strategies.
+See [Backend Testing Guide](./14-backend-testing.md) for detailed testing strategies.
 
 ## Next Steps
 
-- [Database & ORM](./12-database-orm.md)
-- [GraphQL API](./13-graphql-api.md)
-- [Authentication](./14-auth.md)
-- [Backend Testing](./17-backend-testing.md)
+- [Database & ORM](./09-database-orm.md)
+- [GraphQL API](./10-graphql-api.md)
+- [Authentication](./11-auth.md)
+- [Backend Testing](./14-backend-testing.md)
 
 ---
 
 **Related Documentation:**
-- [System Architecture](./04-system-architecture.md)
-- [Technology Stack](./06-technology-stack.md)
-- [Frontend Architecture](./07-frontend-architecture.md)
+- [System Architecture](./02-system-architecture.md)
+- [Technology Stack](./04-technology-stack.md)
+- [Frontend Architecture](./05-frontend-architecture.md)
 

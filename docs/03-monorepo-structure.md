@@ -1,4 +1,5 @@
-# Monorepo St
+# Monorepo Structure
+
 Understanding Twenty's Nx-powered monorepo organization.
 
 ## Overview
@@ -52,8 +53,15 @@ packages/twenty-front/
 │   ├── modules/              # Feature modules
 │   ├── pages/                # Route components
 │   ├── generated/            # Generated GraphQL types
+│   ├── generated-metadata/   # Generated metadata types
 │   ├── testing/              # Test utilities
-│   └── __stories__/          # Storybook stories
+│   ├── hooks/                # Custom React hooks
+│   ├── utils/                # Utility functions
+│   ├── types/                # TypeScript type definitions
+│   ├── config/               # Configuration files
+│   ├── loading/              # Loading states
+│   ├── locales/              # Locale files
+│   └── localization/         # Localization utilities
 ├── public/                   # Static assets
 ├── .storybook/               # Storybook configuration
 ├── vite.config.ts            # Vite configuration
@@ -84,12 +92,15 @@ packages/twenty-server/
 ├── src/
 │   ├── engine/               # Core engine
 │   │   ├── api/              # GraphQL API
-│   │   ├── metadata/         # Metadata management
-│   │   ├── workspace/        # Workspace management
-│   │   └── twenty-orm/       # Custom ORM
+│   │   ├── metadata-modules/ # Metadata management
+│   │   ├── workspace-manager/# Workspace management
+│   │   ├── workspace-datasource/ # Workspace data sources
+│   │   ├── twenty-orm/       # Custom ORM
+│   │   ├── core-modules/     # Core modules
+│   │   └── ...               # Other engine components
 │   ├── modules/              # Business logic modules
 │   ├── database/             # Migrations and seeds
-│   ├── integrations/         # External integrations
+│   ├── command/              # CLI commands
 │   └── main.ts               # Application entry point
 ├── test/                     # Integration tests
 ├── scripts/                  # Utility scripts
@@ -212,21 +223,15 @@ const client = new TwentyClient({
 ```
 
 #### twenty-cli
-**Command-line interface**
+**Command-line interface (DEPRECATED)**
+
+> **Note:** This package is deprecated. Use `twenty-sdk` instead: https://www.npmjs.com/package/twenty-sdk
 
 ```
 packages/twenty-cli/
-├── src/
-│   ├── commands/             # CLI commands
-│   ├── utils/                # Utility functions
-│   └── index.ts              # CLI entry point
-└── package.json              # Package dependencies
-```
-
-**Usage:**
-```bash
-npx @twenty/cli init
-npx @twenty/cli generate module
+├── deprecate.js              # Deprecation notice
+├── package.json              # Package dependencies
+└── README.md                 # Documentation
 ```
 
 #### create-twenty-app
@@ -235,9 +240,10 @@ npx @twenty/cli generate module
 ```
 packages/create-twenty-app/
 ├── src/
-│   ├── templates/            # Project templates
-│   ├── generators/           # Code generators
-│   └── index.ts              # CLI entry point
+│   ├── constants/            # Constants
+│   ├── utils/                # Utility functions
+│   ├── cli.ts                # CLI entry point
+│   └── create-app.command.ts # Create app command
 └── package.json              # Package dependencies
 ```
 
@@ -539,12 +545,12 @@ nx build twenty-front --analyze
 
 ## Next Steps
 
-- [Technology Stack](./06-technology-stack.md)
-- [Frontend Architecture](./07-frontend-architecture.md)
-- [Backend Architecture](./11-backend-architecture.md)
+- [Technology Stack](./04-technology-stack.md)
+- [Frontend Architecture](./05-frontend-architecture.md)
+- [Backend Architecture](./08-backend-architecture.md)
 
 ---
 
 **Related Documentation:**
-- [Development Setup](./03-development-setup.md)
-- [System Architecture](./04-system-architecture.md)
+- [Project Overview](./01-project-overview.md)
+- [System Architecture](./02-system-architecture.md)

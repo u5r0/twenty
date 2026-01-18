@@ -4,30 +4,23 @@ Complete guide to database architecture and ORM usage in Twenty.
 
 ## Database Architecture
 
-Twenty uses a multi-database strategy:
+Twenty uses a multi-database strategy with PostgreSQL as the primary database:
 
 ```
 ┌──────────────────────────────────────────────────┐
 │           PostgreSQL (Primary)                    │
 │  ┌────────────────────────────────────────────┐  │
-│  │  System Database                           │  │
+│  │  System Database (core schema)             │  │
 │  │  - Users                                   │  │
 │  │  - Workspaces                              │  │
 │  │  - Metadata (Object/Field definitions)     │  │
 │  └────────────────────────────────────────────┘  │
 │  ┌────────────────────────────────────────────┐  │
-│  │  Workspace Databases (per workspace)       │  │
+│  │  Workspace Schemas (per workspace)         │  │
 │  │  - Companies                               │  │
 │  │  - People                                  │  │
 │  │  - Custom Objects                          │  │
 │  └────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────┘
-
-┌──────────────────────────────────────────────────┐
-│           ClickHouse (Analytics)                  │
-│  - Event tracking                                 │
-│  - Analytics queries                              │
-│  - Historical data                                │
 └──────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────┐
@@ -38,9 +31,17 @@ Twenty uses a multi-database strategy:
 └──────────────────────────────────────────────────┘
 ```
 
+**Key Points:**
+- The `core` schema contains system-level tables managed by TypeORM
+- Each workspace gets its own PostgreSQL schema with dynamically generated tables
+- Workspace schemas are managed by TwentyORM based on metadata definitions
+- Redis is used for caching and job queuing with BullMQ
+
 ## PostgreSQL Schema
 
-### System Database
+The following schemas are illustrative examples of the database structure. The actual schema is managed through TypeORM entities and migrations for the core schema, and dynamically generated through metadata for workspace schemas.
+
+### System Database (Core Schema)
 
 ```sql
 -- Users table
@@ -114,6 +115,8 @@ CREATE TABLE field_metadata (
 
 ### Workspace Database
 
+Workspace-specific tables are dynamically generated based on object metadata. Here's an illustrative example of what workspace tables might look like:
+
 ```sql
 -- Companies table (example)
 CREATE TABLE companies (
@@ -156,478 +159,349 @@ CREATE INDEX idx_people_deleted_at ON people(deleted_at);
 
 ## TypeORM
 
+Twenty uses TypeORM as the underlying ORM for the core database (system tables like users, workspaces, metadata). However, for workspace-specific data, Twenty uses its custom TwentyORM layer (see below).
+
+TypeORM is primarily used for:
+- Core system entities (users, workspaces, object/field metadata)
+- Database migrations
+- Core schema management
+
+The TypeORM configuration is located in `packages/twenty-server/src/database/typeorm/core/core.datasource.ts`.
+
 ### Entity Definition
 
+Twenty uses a custom entity system with `@WorkspaceEntity` decorators rather than standard TypeORM entities. Here's an example from the actual codebase:
+
 ```typescript
-import {
-  Entity,
-  Column,
-  PrimaryGeneratedColumn,
-  CreateDateColumn,
-  UpdateDateColumn,
-  DeleteDateColumn,
-  ManyToOne,
-  OneToMany,
-  JoinColumn,
-} from 'typeorm';
+import { msg } from '@lingui/core/macro';
+import { STANDARD_OBJECT_IDS } from 'twenty-shared/metadata';
+import { FieldMetadataType, RelationOnDeleteAction } from 'twenty-shared/types';
 
-@Entity('companies')
-export class Company {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+import { RelationType } from 'src/engine/metadata-modules/field-metadata/interfaces/relation-type.interface';
+import { Relation } from 'src/engine/workspace-manager/workspace-sync-metadata/interfaces/relation.interface';
 
-  @Column({ type: 'varchar', length: 255 })
-  name: string;
+import { BaseWorkspaceEntity } from 'src/engine/twenty-orm/base.workspace-entity';
+import { WorkspaceEntity } from 'src/engine/twenty-orm/decorators/workspace-entity.decorator';
+import { WorkspaceField } from 'src/engine/twenty-orm/decorators/workspace-field.decorator';
+import { WorkspaceIsNullable } from 'src/engine/twenty-orm/decorators/workspace-is-nullable.decorator';
+import { WorkspaceRelation } from 'src/engine/twenty-orm/decorators/workspace-relation.decorator';
+import { WorkspaceJoinColumn } from 'src/engine/twenty-orm/decorators/workspace-join-column.decorator';
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  domainName: string;
+@WorkspaceEntity({
+  standardId: STANDARD_OBJECT_IDS.company,
+  namePlural: 'companies',
+  labelSingular: msg`Company`,
+  labelPlural: msg`Companies`,
+  description: msg`A company`,
+  icon: 'IconBuildingSkyscraper',
+})
+export class CompanyWorkspaceEntity extends BaseWorkspaceEntity {
+  @WorkspaceField({
+    standardId: COMPANY_STANDARD_FIELD_IDS.name,
+    type: FieldMetadataType.TEXT,
+    label: msg`Name`,
+    description: msg`The company name`,
+    icon: 'IconBuildingSkyscraper',
+  })
+  @WorkspaceIsNullable()
+  name: string | null;
 
-  @Column({ type: 'int', nullable: true })
-  employees: number;
+  @WorkspaceField({
+    standardId: COMPANY_STANDARD_FIELD_IDS.employees,
+    type: FieldMetadataType.NUMBER,
+    label: msg`Employees`,
+    description: msg`Number of employees in the company`,
+    icon: 'IconUsers',
+  })
+  @WorkspaceIsNullable()
+  employees: number | null;
 
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  industry: string;
-
-  @Column({ type: 'jsonb', nullable: true })
-  address: {
-    street?: string;
-    city?: string;
-    state?: string;
-    country?: string;
-    postalCode?: string;
-  };
-
-  @OneToMany(() => Person, person => person.company)
-  people: Person[];
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
-
-  @DeleteDateColumn()
-  deletedAt: Date;
-
-  @Column({ type: 'uuid', nullable: true })
-  createdBy: string;
-
-  @Column({ type: 'uuid', nullable: true })
-  updatedBy: string;
-}
-
-@Entity('people')
-export class Person {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column({ type: 'varchar', length: 100 })
-  firstName: string;
-
-  @Column({ type: 'varchar', length: 100 })
-  lastName: string;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  email: string;
-
-  @Column({ type: 'varchar', length: 50, nullable: true })
-  phone: string;
-
-  @Column({ type: 'uuid', nullable: true })
-  companyId: string;
-
-  @ManyToOne(() => Company, company => company.people)
-  @JoinColumn({ name: 'company_id' })
-  company: Company;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
-
-  @DeleteDateColumn()
-  deletedAt: Date;
+  @WorkspaceRelation({
+    standardId: COMPANY_STANDARD_FIELD_IDS.people,
+    type: RelationType.ONE_TO_MANY,
+    label: msg`People`,
+    description: msg`People linked to the company.`,
+    icon: 'IconUsers',
+    inverseSideTarget: () => PersonWorkspaceEntity,
+    onDelete: RelationOnDeleteAction.SET_NULL,
+  })
+  @WorkspaceIsNullable()
+  people: Relation<PersonWorkspaceEntity[]>;
 }
 ```
 
+**Note:** Twenty uses workspace entities that extend `BaseWorkspaceEntity` and use custom decorators like `@WorkspaceField` and `@WorkspaceRelation` instead of standard TypeORM decorators. The base entity automatically includes `id`, `createdAt`, `updatedAt`, and `deletedAt` fields.
+
 ### Repository Pattern
+
+Twenty uses `WorkspaceRepository` from TwentyORM, which provides workspace-aware queries. Repositories are accessed through the `InjectWorkspaceRepository` decorator:
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsWhere } from 'typeorm';
+import { InjectWorkspaceRepository } from 'src/engine/twenty-orm/decorators/inject-workspace-repository.decorator';
+import { WorkspaceRepository } from 'src/engine/twenty-orm/repository/workspace.repository';
 
 @Injectable()
-export class CompanyRepository {
+export class CompanyService {
   constructor(
-    @InjectRepository(Company)
-    private repository: Repository<Company>,
+    @InjectWorkspaceRepository(CompanyWorkspaceEntity)
+    private readonly companyRepository: WorkspaceRepository<CompanyWorkspaceEntity>,
   ) {}
 
   // Find all
-  async findAll(): Promise<Company[]> {
-    return this.repository.find({
-      where: { deletedAt: null },
-      order: { name: 'ASC' },
-    });
+  async findAll(): Promise<CompanyWorkspaceEntity[]> {
+    return this.companyRepository.find({});
   }
 
   // Find one
-  async findOne(id: string): Promise<Company | null> {
-    return this.repository.findOne({
-      where: { id, deletedAt: null },
-    });
+  async findOne(id: string): Promise<CompanyWorkspaceEntity | null> {
+    return this.companyRepository.findOne({ where: { id } });
   }
 
   // Find with relations
-  async findWithPeople(id: string): Promise<Company | null> {
-    return this.repository.findOne({
-      where: { id, deletedAt: null },
-      relations: ['people'],
+  async findWithPeople(id: string): Promise<CompanyWorkspaceEntity | null> {
+    return this.companyRepository.findOne({
+      where: { id },
+      relations: { people: true },
     });
   }
 
   // Create
-  async create(data: Partial<Company>): Promise<Company> {
-    const company = this.repository.create(data);
-    return this.repository.save(company);
+  async create(data: Partial<CompanyWorkspaceEntity>): Promise<CompanyWorkspaceEntity> {
+    return this.companyRepository.save(data);
   }
 
   // Update
-  async update(id: string, data: Partial<Company>): Promise<Company> {
-    await this.repository.update(id, data);
+  async update(id: string, data: Partial<CompanyWorkspaceEntity>): Promise<CompanyWorkspaceEntity> {
+    await this.companyRepository.update({ id }, data);
     return this.findOne(id);
   }
 
-  // Soft delete
-  async softDelete(id: string): Promise<void> {
-    await this.repository.softDelete(id);
-  }
-
-  // Hard delete
-  async hardDelete(id: string): Promise<void> {
-    await this.repository.delete(id);
-  }
-
-  // Custom queries
-  async findByIndustry(industry: string): Promise<Company[]> {
-    return this.repository.find({
-      where: { industry, deletedAt: null },
-    });
-  }
-
-  async countByIndustry(): Promise<Record<string, number>> {
-    const results = await this.repository
-      .createQueryBuilder('company')
-      .select('company.industry', 'industry')
-      .addSelect('COUNT(*)', 'count')
-      .where('company.deletedAt IS NULL')
-      .groupBy('company.industry')
-      .getRawMany();
-
-    return results.reduce((acc, { industry, count }) => {
-      acc[industry] = parseInt(count);
-      return acc;
-    }, {});
+  // Delete (soft delete is automatic)
+  async delete(id: string): Promise<void> {
+    await this.companyRepository.delete({ id });
   }
 }
 ```
 
+**Note:** TwentyORM repositories are workspace-scoped and automatically handle soft deletes. The repository interface is similar to TypeORM but adapted for Twenty's multi-tenant architecture.
+
 ### Query Builder
 
-```typescript
-// Simple query
-const companies = await this.repository
-  .createQueryBuilder('company')
-  .where('company.industry = :industry', { industry: 'Technology' })
-  .andWhere('company.employees >= :minEmployees', { minEmployees: 100 })
-  .orderBy('company.name', 'ASC')
-  .getMany();
+TwentyORM provides workspace-aware query builders through the repository:
 
-// With joins
-const companies = await this.repository
-  .createQueryBuilder('company')
-  .leftJoinAndSelect('company.people', 'people')
-  .where('company.industry = :industry', { industry: 'Technology' })
-  .getMany();
+```typescript
+// Simple query with filters
+const companies = await this.companyRepository.find({
+  where: {
+    employees: { gte: 100 },
+  },
+  order: { name: 'ASC' },
+});
+
+// With relations
+const companies = await this.companyRepository.find({
+  where: { id },
+  relations: { people: true },
+});
 
 // With pagination
-const [companies, total] = await this.repository
-  .createQueryBuilder('company')
-  .skip(offset)
-  .take(limit)
-  .getManyAndCount();
+const companies = await this.companyRepository.find({
+  skip: offset,
+  take: limit,
+});
 
-// Complex query
-const companies = await this.repository
-  .createQueryBuilder('company')
-  .leftJoin('company.people', 'people')
-  .where('company.industry = :industry', { industry: 'Technology' })
-  .andWhere(
-    new Brackets(qb => {
-      qb.where('company.employees >= :min', { min: 100 })
-        .orWhere('people.id IS NOT NULL');
-    })
-  )
-  .groupBy('company.id')
-  .having('COUNT(people.id) > :count', { count: 5 })
+// Complex queries using select query builder
+const queryBuilder = this.companyRepository.createQueryBuilder('company');
+const companies = await queryBuilder
+  .where('company.employees >= :min', { min: 100 })
   .orderBy('company.name', 'ASC')
   .getMany();
-
-// Raw query
-const results = await this.repository.query(
-  'SELECT * FROM companies WHERE industry = $1',
-  ['Technology']
-);
 ```
+
+**Note:** TwentyORM's query interface is similar to TypeORM but includes workspace isolation and metadata-driven field resolution. For complex queries, you can still access the underlying TypeORM query builder through the repository.
 
 ### Transactions
 
+TwentyORM supports transactions through the workspace data source:
+
 ```typescript
-import { DataSource } from 'typeorm';
+import { Injectable } from '@nestjs/common';
+import { InjectWorkspaceRepository } from 'src/engine/twenty-orm/decorators/inject-workspace-repository.decorator';
+import { WorkspaceRepository } from 'src/engine/twenty-orm/repository/workspace.repository';
+import { GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
 
 @Injectable()
 export class CompanyService {
   constructor(
-    private dataSource: DataSource,
-    private companyRepository: CompanyRepository,
-    private personRepository: PersonRepository,
+    @InjectWorkspaceRepository(CompanyWorkspaceEntity)
+    private readonly companyRepository: WorkspaceRepository<CompanyWorkspaceEntity>,
+    @InjectWorkspaceRepository(PersonWorkspaceEntity)
+    private readonly personRepository: WorkspaceRepository<PersonWorkspaceEntity>,
+    private readonly globalWorkspaceOrmManager: GlobalWorkspaceOrmManager,
   ) {}
 
   async createCompanyWithPeople(
-    companyData: Partial<Company>,
-    peopleData: Partial<Person>[],
-  ): Promise<Company> {
-    return this.dataSource.transaction(async manager => {
+    workspaceId: string,
+    companyData: Partial<CompanyWorkspaceEntity>,
+    peopleData: Partial<PersonWorkspaceEntity>[],
+  ): Promise<CompanyWorkspaceEntity> {
+    const dataSource = await this.globalWorkspaceOrmManager.getDataSourceForWorkspace(workspaceId);
+
+    return dataSource.transaction(async (manager) => {
       // Create company
-      const company = manager.create(Company, companyData);
-      await manager.save(company);
+      const company = await this.companyRepository.save(companyData);
 
-      // Create people
-      const people = peopleData.map(data =>
-        manager.create(Person, {
-          ...data,
-          companyId: company.id,
-        })
+      // Create people linked to company
+      const people = await Promise.all(
+        peopleData.map(data =>
+          this.personRepository.save({
+            ...data,
+            companyId: company.id,
+          })
+        )
       );
-      await manager.save(people);
 
-      // Return company with people
-      return manager.findOne(Company, {
-        where: { id: company.id },
-        relations: ['people'],
-      });
+      return company;
     });
   }
 }
 ```
 
+**Note:** Transactions in TwentyORM are workspace-scoped and use the `GlobalWorkspaceOrmManager` to access the correct workspace data source.
+
 ## TwentyORM (Custom ORM)
 
-TwentyORM is a custom ORM layer built on top of TypeORM that provides workspace-aware queries and metadata-driven operations.
+TwentyORM is a custom ORM layer built on top of TypeORM that provides workspace-aware queries and metadata-driven operations. It's located in `packages/twenty-server/src/engine/twenty-orm/`.
 
-### Basic Usage
+### Key Features
+
+- **Workspace Isolation**: Automatically scopes queries to the correct workspace database
+- **Metadata-Driven**: Uses object and field metadata to generate schemas dynamically
+- **Custom Decorators**: Provides `@WorkspaceEntity`, `@WorkspaceField`, `@WorkspaceRelation` decorators
+- **Repository Pattern**: Extends TypeORM repositories with workspace awareness
+- **Entity Manager**: `WorkspaceEntityManager` for workspace-scoped operations
+
+### Architecture
+
+```
+twenty-orm/
+├── decorators/           # Custom decorators for workspace entities
+├── entity-manager/       # Workspace-aware entity manager
+├── repository/           # Workspace repository implementation
+├── global-workspace-datasource/  # Manages workspace data sources
+├── factories/            # Entity schema factories
+└── base.workspace-entity.ts  # Base class for all workspace entities
+```
+
+### Usage with Repositories
+
+The primary way to interact with TwentyORM is through workspace repositories:
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { TwentyORM } from '@/engine/twenty-orm';
+import { InjectWorkspaceRepository } from 'src/engine/twenty-orm/decorators/inject-workspace-repository.decorator';
+import { WorkspaceRepository } from 'src/engine/twenty-orm/repository/workspace.repository';
 
 @Injectable()
 export class CompanyService {
-  constructor(private twentyOrm: TwentyORM) {}
+  constructor(
+    @InjectWorkspaceRepository(CompanyWorkspaceEntity)
+    private readonly companyRepository: WorkspaceRepository<CompanyWorkspaceEntity>,
+  ) {}
 
-  async findAll(workspaceId: string): Promise<Company[]> {
-    return this.twentyOrm
-      .workspace(workspaceId)
-      .findMany('company', {
-        where: {},
-        orderBy: { name: 'asc' },
-      });
+  async findAll(): Promise<CompanyWorkspaceEntity[]> {
+    return this.companyRepository.find({});
   }
 
-  async findOne(workspaceId: string, id: string): Promise<Company> {
-    return this.twentyOrm
-      .workspace(workspaceId)
-      .findOne('company', {
-        where: { id },
-      });
+  async findOne(id: string): Promise<CompanyWorkspaceEntity | null> {
+    return this.companyRepository.findOne({ where: { id } });
   }
 
-  async create(
-    workspaceId: string,
-    data: Partial<Company>,
-  ): Promise<Company> {
-    return this.twentyOrm
-      .workspace(workspaceId)
-      .create('company', data);
-  }
-
-  async update(
-    workspaceId: string,
-    id: string,
-    data: Partial<Company>,
-  ): Promise<Company> {
-    return this.twentyOrm
-      .workspace(workspaceId)
-      .update('company', {
-        where: { id },
-        data,
-      });
-  }
-
-  async delete(workspaceId: string, id: string): Promise<void> {
-    await this.twentyOrm
-      .workspace(workspaceId)
-      .delete('company', {
-        where: { id },
-      });
+  async create(data: Partial<CompanyWorkspaceEntity>): Promise<CompanyWorkspaceEntity> {
+    return this.companyRepository.save(data);
   }
 }
 ```
 
-### Advanced Queries
+### Module Registration
+
+To use TwentyORM repositories, import the `TwentyORMModule`:
 
 ```typescript
-// With relations
-const companies = await this.twentyOrm
-  .workspace(workspaceId)
-  .findMany('company', {
-    where: { industry: 'Technology' },
-    include: {
-      people: true,
-    },
-  });
+import { Module } from '@nestjs/common';
+import { TwentyORMModule } from 'src/engine/twenty-orm/twenty-orm.module';
 
-// With filters
-const companies = await this.twentyOrm
-  .workspace(workspaceId)
-  .findMany('company', {
-    where: {
-      AND: [
-        { industry: { eq: 'Technology' } },
-        { employees: { gte: 100 } },
-      ],
-    },
-  });
-
-// With pagination
-const result = await this.twentyOrm
-  .workspace(workspaceId)
-  .findMany('company', {
-    where: {},
-    take: 10,
-    skip: 0,
-  });
-
-// Aggregations
-const stats = await this.twentyOrm
-  .workspace(workspaceId)
-  .aggregate('company', {
-    _count: true,
-    _avg: { employees: true },
-    _sum: { employees: true },
-    _min: { employees: true },
-    _max: { employees: true },
-  });
+@Module({
+  imports: [TwentyORMModule],
+  providers: [CompanyService],
+})
+export class CompanyModule {}
 ```
 
 ## Migrations
 
-### Creating Migrations
+Twenty uses TypeORM migrations for the core database schema. Migrations are located in `packages/twenty-server/src/database/typeorm/core/migrations/`.
 
-```bash
-# Generate migration from entity changes
-yarn database:migration:generate src/database/migrations/AddCompanyAddress
+### Migration Structure
 
-# Create empty migration
-yarn database:migration:create src/database/migrations/AddIndexes
-```
+Migrations are organized into subdirectories:
+- `common/` - Migrations for all deployments
+- `billing/` - Migrations for billing features (when enabled)
 
-### Migration File
+### Migration File Example
+
+Here's an actual migration from the codebase:
 
 ```typescript
-import { MigrationInterface, QueryRunner, Table, TableIndex } from 'typeorm';
+import { type MigrationInterface, type QueryRunner } from 'typeorm';
 
-export class AddCompanyAddress1234567890 implements MigrationInterface {
+export class AddPublicDomainEntity1757013851879 implements MigrationInterface {
+  name = 'AddPublicDomainEntity1757013851879';
+
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Add column
-    await queryRunner.addColumn(
-      'companies',
-      new TableColumn({
-        name: 'address',
-        type: 'jsonb',
-        isNullable: true,
-      })
+    await queryRunner.query(
+      `CREATE TABLE "core"."publicDomain" (
+        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+        "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "domain" character varying NOT NULL,
+        "isValidated" boolean NOT NULL DEFAULT false,
+        "workspaceId" uuid NOT NULL,
+        CONSTRAINT "UQ_1311e24fbd049c561c53a274f2a" UNIQUE ("domain"),
+        CONSTRAINT "PK_ff55a0f1bc3b6e2c32feff734b1" PRIMARY KEY ("id")
+      )`,
     );
-
-    // Add index
-    await queryRunner.createIndex(
-      'companies',
-      new TableIndex({
-        name: 'idx_companies_industry',
-        columnNames: ['industry'],
-      })
-    );
-
-    // Create table
-    await queryRunner.createTable(
-      new Table({
-        name: 'company_notes',
-        columns: [
-          {
-            name: 'id',
-            type: 'uuid',
-            isPrimary: true,
-            generationStrategy: 'uuid',
-            default: 'uuid_generate_v4()',
-          },
-          {
-            name: 'company_id',
-            type: 'uuid',
-          },
-          {
-            name: 'content',
-            type: 'text',
-          },
-          {
-            name: 'created_at',
-            type: 'timestamp',
-            default: 'CURRENT_TIMESTAMP',
-          },
-        ],
-        foreignKeys: [
-          {
-            columnNames: ['company_id'],
-            referencedTableName: 'companies',
-            referencedColumnNames: ['id'],
-            onDelete: 'CASCADE',
-          },
-        ],
-      })
+    await queryRunner.query(
+      `ALTER TABLE "core"."publicDomain"
+       ADD CONSTRAINT "FK_7e9ca5fd7aa30b8396ea3d1d6be"
+       FOREIGN KEY ("workspaceId")
+       REFERENCES "core"."workspace"("id")
+       ON DELETE CASCADE ON UPDATE NO ACTION`,
     );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.dropTable('company_notes');
-    await queryRunner.dropIndex('companies', 'idx_companies_industry');
-    await queryRunner.dropColumn('companies', 'address');
+    await queryRunner.query(
+      `ALTER TABLE "core"."publicDomain" DROP CONSTRAINT "FK_7e9ca5fd7aa30b8396ea3d1d6be"`,
+    );
+    await queryRunner.query(`DROP TABLE "core"."publicDomain"`);
   }
 }
 ```
 
 ### Running Migrations
 
+Migrations are run using TypeORM CLI commands defined in `package.json`:
+
 ```bash
-# Run migrations
-yarn database:migrate
+# Run migrations in production
+yarn database:migrate:prod
 
-# Revert last migration
-yarn database:migrate:revert
-
-# Show migration status
-yarn database:migration:show
+# This executes: npx -y typeorm migration:run -d dist/database/typeorm/core/core.datasource
 ```
+
+**Note:** Twenty uses raw SQL queries in migrations rather than TypeORM's schema builder classes. Migrations target the `core` schema for system-level tables, while workspace-specific tables are managed dynamically through the metadata system.
 
 ## Database Best Practices
 
@@ -655,22 +529,20 @@ CREATE INDEX idx_companies_name_fts
 ### 2. Use Soft Deletes
 
 ```typescript
-// Entity with soft delete
-@Entity()
-export class Company {
-  @DeleteDateColumn()
-  deletedAt: Date;
-}
+// Workspace entities automatically include soft delete support via BaseWorkspaceEntity
+// The deletedAt field is inherited from BaseWorkspaceEntity
 
-// Soft delete
-await repository.softDelete(id);
+// Soft delete (default behavior)
+await repository.delete({ id });
 
-// Restore
-await repository.restore(id);
-
-// Find including deleted
-await repository.find({ withDeleted: true });
+// Find including deleted records
+await repository.find({
+  where: { id },
+  withDeleted: true
+});
 ```
+
+**Note:** All workspace entities extend `BaseWorkspaceEntity` which includes `deletedAt` field. Soft deletes are the default behavior in TwentyORM.
 
 ### 3. Use Transactions
 
@@ -686,20 +558,21 @@ await dataSource.transaction(async manager => {
 
 ```typescript
 // ❌ Bad - N+1 query problem
-const companies = await companyRepository.find();
+const companies = await companyRepository.find({});
 for (const company of companies) {
   company.people = await personRepository.find({
     where: { companyId: company.id },
   });
 }
 
-// ✅ Good - Use joins
+// ✅ Good - Use relations
 const companies = await companyRepository.find({
-  relations: ['people'],
+  relations: { people: true },
 });
 
-// ✅ Better - Use DataLoader
-const companies = await companyRepository.find();
+// ✅ Better - Use DataLoader for GraphQL
+// Twenty uses DataLoader in the GraphQL layer to batch and cache queries
+const companies = await companyRepository.find({});
 const peopleByCompanyId = await dataLoader.loadMany(
   companies.map(c => c.id)
 );
@@ -727,12 +600,12 @@ export default {
 
 ## Next Steps
 
-- [Backend Architecture](./11-backend-architecture.md)
-- [GraphQL API](./13-graphql-api.md)
-- [System Architecture](./04-system-architecture.md)
+- [Backend Architecture](./08-backend-architecture.md)
+- [GraphQL API](./10-graphql-api.md)
+- [System Architecture](./02-system-architecture.md)
 
 ---
 
 **Related Documentation:**
-- [Technology Stack](./06-technology-stack.md)
-- [Deployment](./18-deployment.md)
+- [Technology Stack](./04-technology-stack.md)
+- [Deployment](./15-deployment.md)

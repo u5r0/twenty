@@ -672,27 +672,20 @@ function Dropdown({ items, onSelect }: DropdownProps) {
 ### Error Boundaries
 
 ```typescript
-class ErrorBoundary extends Component<Props, State> {
-  state = { hasError: false, error: null };
+import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
 
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Error caught:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return <ErrorFallback error={this.state.error} />;
-    }
-    return this.props.children;
-  }
+function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
+  return (
+    <div role="alert">
+      <p>Something went wrong:</p>
+      <pre>{error.message}</pre>
+      <button onClick={resetErrorBoundary}>Try again</button>
+    </div>
+  );
 }
 
 // Usage
-<ErrorBoundary>
+<ErrorBoundary FallbackComponent={ErrorFallback}>
   <App />
 </ErrorBoundary>
 ```
@@ -806,13 +799,11 @@ export function Button(props: ButtonProps) {
 
 ## Next Steps
 
-- [Frontend Architecture](./07-frontend-architecture.md)
-- [State Management](./09-state-management.md)
-- [Styling Guide](./10-styling-guide.md)
-- [Frontend Testing](./16-frontend-testing.md)
+- [Frontend Architecture](./05-frontend-architecture.md)
+- [State Management](./07-state-management.md)
+- [Frontend Testing](./13-frontend-testing.md)
 
 ---
 
 **Related Documentation:**
-- [Code Style](./22-code-style.md)
-- [Technology Stack](./06-technology-stack.md)
+- [Technology Stack](./04-technology-stack.md)
